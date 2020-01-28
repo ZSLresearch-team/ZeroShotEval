@@ -9,3 +9,15 @@ Pipeline
 ![zeroshoteval_pipeline](docs/zeroshoteval_pipeline.png)
 
 *NOTE: in the figure above there are examples of Python scripts and its names. Please note that it is work names for visualizing the structure of the project.*
+
+Usage
+---------
+
+**Step 1: datasets loading**
+
+Go to **scripts** directory and run downloading scripts. Example:
+
+    cd ./scripts 
+    ./cub_download.sh
+    
+All datasets are placed in **data** directory
