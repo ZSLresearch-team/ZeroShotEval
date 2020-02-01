@@ -14,4 +14,6 @@ for folder in ${SubFolders[@]}; do
        echo $folder successfully loaded
 done
 rm $CUB_path/._*
+rm $CUB_path/*/._*
+rm $CUB_path/*/*/._*
 echo Done
