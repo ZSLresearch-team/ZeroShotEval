@@ -44,13 +44,13 @@ config.datasets = ['cub']
 #region MODEL CONFIGS
 model = edict()
 
-model.general_hyperparameters = edict()  # general hyperparameters for all models
-model.general_hyperparameters.device = "cuda"
-model.general_hyperparameters.num_shots = 0
-model.general_hyperparameters.generalized = True
-model.general_hyperparameters.batch_size = 32
-model.general_hyperparameters.nepoch = 100
-model.general_hyperparameters.fp16_train_mode = False  # for GPUs with tensor cores
+model.general_hyper = edict()  # general hyper for all models
+model.general_hyper.device = "cpu"
+model.general_hyper.num_shots = 0
+model.general_hyper.generalized = True
+model.general_hyper.batch_size = 32
+model.general_hyper.nepoch = 100
+model.general_hyper.fp16_train_mode = False  # for GPUs with tensor cores
 
 
 #region CADA_VAE CONFIGS
@@ -60,13 +60,13 @@ model.cada_vae.model_name = "cada_vae"
 model.cada_vae.cross_resonstuction = True
 model.cada_vae.distance = "wasserstein"
 
-model.cada_vae.specific_paraneters = edict()
-model.cada_vae.specific_paraneters.lr_gen_model = 0.00015
-model.cada_vae.specific_paraneters.loss = 'l1'
-model.cada_vae.specific_paraneters.latent_size = 64
-model.cada_vae.specific_paraneters.lr_cls = 0.001
-model.cada_vae.specific_paraneters.cls_train_epochs = 100  # early stopping nepoch стоит изменить
-model.cada_vae.specific_paraneters.auxiliary_data_source = 'attributes'  # для общности следует переделать эту и связанные части
+model.cada_vae.specific_parameters = edict()
+model.cada_vae.specific_parameters.lr_gen_model = 0.00015
+model.cada_vae.specific_parameters.loss = 'l1'
+model.cada_vae.specific_parameters.latent_size = 64
+model.cada_vae.specific_parameters.lr_cls = 0.001
+model.cada_vae.specific_parameters.cls_train_epochs = 100  # early stopping nepoch стоит изменить
+model.cada_vae.specific_parameters.auxiliary_data_source = 'attributes'  # для общности следует переделать эту и связанные части
 
 
 # NOTE: эти парамертры стоит извлекать из генераторов эмбедингов/кэшированных эмбедингов.
@@ -75,27 +75,34 @@ model.cada_vae.specific_paraneters.auxiliary_data_source = 'attributes'  # дл�
 # Стоит ли развести скрытые слои для декодера/энкодера?
 
 
-model.cada_vae.specific_paraneters.hidden_layers = edict()
-model.cada_vae.specific_paraneters.hidden_layers.cnn_features = (1560, 1660)
-model.cada_vae.specific_paraneters.hidden_layers.attributes = (1450, 665)
-model.cada_vae.specific_paraneters.hidden_layers.sentences = (1450, 665)
-model.cada_vae.specific_paraneters.input_features_from_cnn = 2048  # for ResNet101
+model.cada_vae.specific_parameters.hidden_layers = edict()
+model.cada_vae.specific_parameters.hidden_layers.cnn_features = (1560, 1660)
+model.cada_vae.specific_parameters.hidden_layers.attributes = (1450, 665)
+model.cada_vae.specific_parameters.hidden_layers.sentences = (1450, 665)
+model.cada_vae.specific_parameters.input_features_from_cnn = 2048  # for ResNet101
 
-model.cada_vae.specific_paraneters.warmup = edict()
-model.cada_vae.specific_paraneters.warmup.beta = edict()
-model.cada_vae.specific_paraneters.warmup.beta.factor = 0.25
-model.cada_vae.specific_paraneters.warmup.beta.end_epoch = 93
-model.cada_vae.specific_paraneters.warmup.beta.start_epoch = 0
+model.cada_vae.specific_parameters.hidden_size_rule = edict()
+model.cada_vae.specific_parameters.hidden_size_rule.resnet_features = (1560, 1660)
+model.cada_vae.specific_parameters.hidden_size_rule.attributes = (1450, 665)
+model.cada_vae.specific_parameters.hidden_size_rule.sentences = (1450, 665)
 
-model.cada_vae.specific_paraneters.warmup.cross_reconstuction = edict()
-model.cada_vae.specific_paraneters.warmup.cross_reconstuction.factor = 2.37
-model.cada_vae.specific_paraneters.warmup.cross_reconstuction.end_epoch = 75
-model.cada_vae.specific_paraneters.warmup.cross_reconstuction.start_epoch = 21
+model.cada_vae.specific_parameters.warmup = edict()
+model.cada_vae.specific_parameters.warmup.beta = edict()
+model.cada_vae.specific_parameters.warmup.beta.factor = 0.25
+model.cada_vae.specific_parameters.warmup.beta.end_epoch = 93
+model.cada_vae.specific_parameters.warmup.beta.start_epoch = 0
 
-model.cada_vae.specific_paraneters.warmup.distance = edict()
-model.cada_vae.specific_paraneters.warmup.distance.factor = 8.13
-model.cada_vae.specific_paraneters.warmup.distance.end_epoch = 22
-model.cada_vae.specific_paraneters.warmup.distance.start_epoch = 6
+model.cada_vae.specific_parameters.warmup.cross_reconstruction = edict()
+model.cada_vae.specific_parameters.warmup.cross_reconstruction.factor = 2.37
+model.cada_vae.specific_parameters.warmup.cross_reconstruction.end_epoch = 75
+model.cada_vae.specific_parameters.warmup.cross_reconstruction.start_epoch = 21
+
+model.cada_vae.specific_parameters.warmup.distance = edict()
+model.cada_vae.specific_parameters.warmup.distance.factor = 8.13
+model.cada_vae.specific_parameters.warmup.distance.end_epoch = 22
+model.cada_vae.specific_parameters.warmup.distance.start_epoch = 6
+
+model.cada_vae.specific_parameters.cls_train_steps = 29  # TODO: transfer auto selection from original repo
 #endregion
 
 #region CLSWGAN CONFIGS
@@ -161,10 +168,13 @@ default.object_embedding = "resnet101"
 def generate_config(parsed_model, parsed_datasets):
     for key, value in model[parsed_model].items():
         config[key] = value
-    for _dataset in parsed_datasets:
-        config[_dataset] = edict()
-        for key, value in dataset[_dataset].items():
-            config[_dataset][key] = value
+    for key, value in dataset[parsed_datasets].items():
+        config[key] = value
+    # for _dataset in parsed_datasets:
+    #     config[_dataset] = edict()
+    #     for key, value in dataset[_dataset].items():
+    #         config[_dataset][key] = value
+    for key, value in model.general_hyper.items():
+        config[key] = value
     config.model = parsed_model
     config.datasets = parsed_datasets
-    

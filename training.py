@@ -11,7 +11,8 @@ import sys
 
 from config import config, default, generate_config
 
-# TODO: from vae_net import vae_model
+from src.zeroshot_networks.cada_vae.cada_vae_model import Model as CadaVaeModel
+
 # TODO: from gan_net import gan_model
 #endregion
 
@@ -29,6 +30,7 @@ def init_arguments():
                         help='Name of datasets to use for ZSL training.')
     args, rest = parser.parse_known_args()
 
+    # datasets = args.datasets.split(',')  # for multiple datasets
     generate_config(parsed_model=args.model, parsed_datasets=args.datasets)
 
     # place here other arguments, that are not in config.py if necessary
@@ -67,7 +69,7 @@ def main():
     if config.load_raw_modalities:
         pass  # TODO: pass loaded images and text attributes from the DATA LOADING region 
               # for obj embedding extraction
-    #engregion
+    #endregion
 
 
     #region OBJ EMBEDDINGS READING/CACHING
@@ -81,21 +83,19 @@ def main():
 
     #region ZERO-SHOT MODELS TRAINING
     if args.model == 'cada_vae':
-
+        cada_vae_model = CadaVaeModel(config)
+        cada_vae_model.to(config.device)
+        cada_vae_model.train_vae()
         pass  # TODO: initialize the model with configs
     elif args.model == 'clswgan':
         pass  # TODO: initialize the model with configs
     else:
         raise NotImplementedError('Unknown network')
-
-    # model.train(*args)  # TODO: complete model training call
-
     #endregion
 
 
     #region ZERO-SHOT MODEL INFERENCE
-    # model.predict(*args)  # TODO: implement computing and 
-                            # caching of ZSL embeddings with trained model
+    zsl_embeddings = cada_vae_model.predict()
     #endregion
 
 
