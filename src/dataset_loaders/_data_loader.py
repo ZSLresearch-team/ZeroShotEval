@@ -66,6 +66,28 @@ class DATA_LOADER(object):
         return batch_label, [ batch_feature, batch_att]
 
 
+    def gen_next_batch(self, batch_size, dset_part='train'):
+        if dset_part == 'train':
+            features = self.data['train_seen']['resnet_features']
+            labels = self.data['train_seen']['labels']
+        elif dset_part == 'test':
+            features = self.data['test_unseen']['resnet_features']
+            labels = self.data['test_unseen']['labels']
+        else:
+            raise ValueError('Dataset part is not valid, please specify train or test.')
+
+        iter_len = len(features) // batch_size + 1
+        for current_batch in range(iter_len):
+            current_idx = current_batch * batch_size
+            end_idx = current_idx + batch_size
+
+            batch_features = features[current_idx:end_idx]
+            batch_label = labels[current_idx:end_idx]
+            batch_attr = self.aux_data[batch_label]
+
+            yield batch_label, [batch_features, batch_attr]
+
+
     def read_matdataset(self):
         print('\nReading dataset from .mat file...')
         path= self.datadir + 'res101.mat'

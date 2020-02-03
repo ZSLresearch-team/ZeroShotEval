@@ -229,6 +229,29 @@ class Model(nn.Module):
 
         return losses
 
+    def predict(self):
+        """Inference mode for the model
+        """
+        print('\nComputing ZSL embeddings for test data...')
+        iter_idx = 0
+        embeddings = torch.Tensor()
+        for batch in self.dataset.gen_next_batch(self.batch_size, dset_part='test'):
+            iter_idx += 1
+            label, data_from_modalities = batch
+
+            label = label.long().to(self.device)
+            for j in range(len(data_from_modalities)):
+                data_from_modalities[j] = data_from_modalities[j].to(
+                    self.device)
+            
+            mu_att, logvar_att = self.encoder[self.auxiliary_data_source](data_from_modalities[1])
+            z_from_att = self.reparameterize(mu_att, logvar_att)
+
+            embeddings = torch.cat((embeddings, z_from_att), 0)
+            # embeddings.append(z_from_att)
+        
+        return embeddings
+                
     # def transfer_features(self, n, num_queries='num_features'):
 
         # NOTE: this method is used only for Few-Shot Learning

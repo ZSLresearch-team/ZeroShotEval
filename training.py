@@ -30,7 +30,7 @@ def init_arguments():
                         help='Name of datasets to use for ZSL training.')
     args, rest = parser.parse_known_args()
 
-    # datasets = args.datasets.split(',')
+    # datasets = args.datasets.split(',')  # for multiple datasets
     generate_config(parsed_model=args.model, parsed_datasets=args.datasets)
 
     # place here other arguments, that are not in config.py if necessary
@@ -80,7 +80,6 @@ def main():
         pass  # TODO: cache computed embeddings on the disk
     #endregion
 
-    # hyperparameters = {}  # TODO: load hyperparameters from config file
 
     #region ZERO-SHOT MODELS TRAINING
     if args.model == 'cada_vae':
@@ -92,15 +91,11 @@ def main():
         pass  # TODO: initialize the model with configs
     else:
         raise NotImplementedError('Unknown network')
-
-    # model.train(*args)  # TODO: complete model training call
-
     #endregion
 
 
     #region ZERO-SHOT MODEL INFERENCE
-    # model.predict(*args)  # TODO: implement computing and 
-                            # caching of ZSL embeddings with trained model
+    zsl_embeddings = cada_vae_model.predict()
     #endregion
 
 
