@@ -1,6 +1,6 @@
+from typing import Optional
 from logging import getLogger
 
-import torch
 from torch import cuda, nn, Tensor
 from torchvision import transforms
 from torchvision.models.resnet import resnet101
@@ -25,21 +25,30 @@ class ImageEmbeddingExtractor(EmbeddingExtractor):
         )
     ])
 
-    def __init__(self, extractor_type: ExtractorType = 'resnet101', gpu: bool = False, cuda_device_id: int = 0):
+    def __init__(self, extractor_type: ExtractorType = 'resnet101', use_gpu: bool = False, cuda_device_id: int = 0):
 
         if extractor_type not in self.AVAILABLE_EXTRACTOR_TYPES:
             raise ExtractorTypeError
 
         self.logger = getLogger(self.__class__.__name__ + f"_{self.extractor_type}")
-        self.gpu = gpu
+        self.gpu = use_gpu
 
-        if gpu:
+        if use_gpu:
             self.logger.info("GPU was chosen for embedding extraction")
+
             if not cuda.is_available():
                 self.logger.warning("CUDA is not available, will use CPU")
                 self.gpu = False
             else:
-                self.cuda_device = torch.cuda.device(cuda.current_device())
+                try:
+                    self.cuda_device = cuda.device(cuda_device_id)
+                    self.cuda_device_id = cuda_device_id
+                except AssertionError as ae:
+                    self.logger.error(f"device with id {cuda_device_id} is not available -"
+                                      f"will use device with id 0", exc_info=True)
+                    self.cuda_device_id = 0
+                    self.cuda_device = cuda.device(self.cuda_device_id)
+
                 self.logger.info(f"CUDA is available, will use {cuda.get_device_name(self.cuda_device.idx)}")
         else:
             self.logger.info("CPU was chosen for embedding extraction")
@@ -57,7 +66,7 @@ class ImageEmbeddingExtractor(EmbeddingExtractor):
     def embedding_size(self):
         return self.model.fc.out_features
 
-    def extract_embedding(self, object: ImageObject) -> EmbeddingObject:
+    def extract_embedding(self, object: ImageObject) -> Optional[EmbeddingObject]:
         try:
             x: Tensor = self.DEFAULT_TRANSFORM(object)
             if self.gpu:
