@@ -1,3 +1,3 @@
 # Models
 
-Place all models in this directory.
+Place all trained models in this directory.

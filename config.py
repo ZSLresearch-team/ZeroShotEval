@@ -27,7 +27,6 @@ from easydict import EasyDict as edict
 #region GLOBAL DEFAULT CONFIGS
 config = edict()
 
-config.load_raw_modalities = False
 config.modalities = ['img', 'cls_attr']
 config.img_net = 'resnet101'
 config.cls_attr_net = 'word2vec'
@@ -38,6 +37,8 @@ config.cache_obj_embeddings = True  # recommended always True
 
 config.model = 'cada_vae'
 config.datasets = ['cub']
+
+config.compute_train_zsl_embeddings = True
 #endregion
 
 
@@ -168,12 +169,12 @@ default.object_embedding = "resnet101"
 def generate_config(parsed_model, parsed_datasets):
     for key, value in model[parsed_model].items():
         config[key] = value
-    for key, value in dataset[parsed_datasets].items():
-        config[key] = value
-    # for _dataset in parsed_datasets:
-    #     config[_dataset] = edict()
-    #     for key, value in dataset[_dataset].items():
-    #         config[_dataset][key] = value
+    # for key, value in dataset[parsed_datasets].items():
+    #     config[key] = value
+    for _dataset in parsed_datasets:
+        config[_dataset] = edict()
+        for key, value in dataset[_dataset].items():
+            config[_dataset][key] = value
     for key, value in model.general_hyper.items():
         config[key] = value
     config.model = parsed_model

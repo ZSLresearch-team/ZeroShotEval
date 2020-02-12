@@ -1,3 +1,13 @@
+"""Script for precomputed embeddings loading for 
+the datasets: CUB, SUN, AWA1, AWA2.
+
+The script loads precomputed embeddings from .mat file and 
+transforms it in a unified format.
+
+Embeddings were computed using ResNet101 network pretrained on ImageNet
+The data provided by unofficial resourse and packed into a single .mat file.
+"""
+
 import numpy as np
 import scipy.io as sio
 import torch

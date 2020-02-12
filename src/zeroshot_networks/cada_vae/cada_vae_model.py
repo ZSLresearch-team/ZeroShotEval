@@ -11,7 +11,7 @@ import torch.optim as optim
 import torch.autograd as autograd
 from torch.utils import data
 from src.zeroshot_networks.cada_vae.vae_networks import EncoderTemplate, DecoderTemplate
-from src.dataset_loaders._data_loader import DATA_LOADER as dataloader
+from src.dataset_loaders.cub_awa_sun_emb_loader import DATA_LOADER as dataloader
 # endregion
 
 
@@ -181,7 +181,7 @@ class Model(nn.Module):
 
         return loss.item()
 
-    def train_vae(self):
+    def fit(self):
         losses = []
 
         self.dataloader = data.DataLoader(
@@ -229,7 +229,7 @@ class Model(nn.Module):
 
         return losses
 
-    def predict(self):
+    def transform(self):
         """Inference mode for the model
         """
         print('\nComputing ZSL embeddings for test data...')

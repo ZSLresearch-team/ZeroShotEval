@@ -1,3 +1,6 @@
+"""
+"""
+
 from typing import Optional
 from logging import getLogger
 
@@ -5,9 +8,9 @@ from torch import cuda, nn, Tensor
 from torchvision import transforms
 from torchvision.models.resnet import resnet101
 
-from src.modality_feature_generators.base import EmbeddingExtractor
-from src.modality_feature_generators.exceptions import ExtractorTypeError
-from src.modality_feature_generators._types import EmbeddingObject, ExtractorType, ImageObject
+from src.modalities_feature_extractors.base_classes.base import EmbeddingExtractor
+from src.modalities_feature_extractors.base_classes.exceptions import ExtractorTypeError
+from src.modalities_feature_extractors.base_classes._types import EmbeddingObject, ExtractorType, ImageObject
 
 
 class ImageEmbeddingExtractor(EmbeddingExtractor):

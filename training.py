@@ -11,6 +11,8 @@ import sys
 
 from config import config, default, generate_config
 
+from src.dataset_loaders.data_loader import load_dataset
+from src.modalities_feature_extractors.modalities_feature_extractor import ModalitiesFeatureExtractor
 from src.zeroshot_networks.cada_vae.cada_vae_model import Model as CadaVaeModel
 
 # TODO: from gan_net import gan_model
@@ -30,8 +32,8 @@ def init_arguments():
                         help='Name of datasets to use for ZSL training.')
     args, rest = parser.parse_known_args()
 
-    # datasets = args.datasets.split(',')  # for multiple datasets
-    generate_config(parsed_model=args.model, parsed_datasets=args.datasets)
+    datasets = args.datasets.split(',')
+    generate_config(parsed_model=args.model, parsed_datasets=datasets)
 
     # place here other arguments, that are not in config.py if necessary
 
@@ -54,21 +56,36 @@ def load_arguments():
 #endregion
 
 
+def save_embeddings(save_dir):
+    pass
+
+
+def load_embeddings(load_dir):
+    pass
+
+
 def main():
     args = load_arguments()
 
     #region DATA LOADING
-    if config.load_raw_modalities:
-        pass  # TODO: load raw images and text attributes from dataset
-    if config.load_dataset_precomputed_embeddings:
-        pass  # TODO: load precomputed embeddings from dataset
+    datasets = []
+    for dataset_name in config.datasets:
+        # dataset_dict contains modalities names as keys and data as values
+        dataset_dict = load_dataset(dataset_name, 
+                                    modalities=config.modalities, 
+                                    path=config[dataset_name].path,
+                                    load_embeddings=config.load_dataset_precomputed_embeddings)
+        datasets.append(dataset_dict)
     #endregion
 
 
     #region DATA EMBEDDINGS EXTRACTION
-    if config.load_raw_modalities:
-        pass  # TODO: pass loaded images and text attributes from the DATA LOADING region 
-              # for obj embedding extraction
+    embeddings = []
+    if not config.load_dataset_precomputed_embeddings:
+        for dataset in datasets:
+            extractor = ModalitiesFeatureExtractor(modalities_dict=dataset)
+            dataset_embeddings = extractor.compute_embeddings()
+            embeddings.append(dataset_embeddings)
     #endregion
 
 
@@ -81,21 +98,30 @@ def main():
     #endregion
 
 
-    #region ZERO-SHOT MODELS TRAINING
+    #region ZERO-SHOT MODELS TRAINING / INFERENCE
+
+    # NOTE: don't forget to handle multiple datasets!
     if args.model == 'cada_vae':
-        cada_vae_model = CadaVaeModel(config)
-        cada_vae_model.to(config.device)
-        cada_vae_model.train_vae()
-        pass  # TODO: initialize the model with configs
+        model = CadaVaeModel(config)
+        model.to(config.device)
+
+        model.fit()
+
     elif args.model == 'clswgan':
         pass  # TODO: initialize the model with configs
+
     else:
         raise NotImplementedError('Unknown network')
+
+    zsl_embeddings = model.transform()
+    if config.compute_zsl_train_embeddings:
+        zsl_train_embeddings = model.transform()
     #endregion
 
 
-    #region ZERO-SHOT MODEL INFERENCE
-    zsl_embeddings = cada_vae_model.predict()
+    #region ZSL EMBEDDINGS CACHING
+    if config.cache_zsl_embeddings:
+        pass  # TODO: cache computed embeddings on the disk
     #endregion
 
 
