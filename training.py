@@ -8,8 +8,9 @@
 #region IMPORTS
 import argparse
 import sys
+import copy
 
-from config import config, default, generate_config
+from config import default, generate_config
 
 from src.dataset_loaders.data_loader import load_dataset
 from src.modalities_feature_extractors.modalities_feature_extractor import ModalitiesFeatureExtractor
@@ -19,21 +20,26 @@ from src.zeroshot_networks.cada_vae.cada_vae_model import Model as CadaVaeModel
 #endregion
 
 
-#region ARGUMENTS
+#region ARGUMENTS PROCESSING
 def init_arguments():
     """Initialize arguments replacing the default ones.
     """
     parser = argparse.ArgumentParser(description='Main script-launcher for training of ZSL models')
     
     # general configs
-    parser.add_argument('--model', default=config.model,
+    parser.add_argument('--model', default=default.model,
                         help='Name of model to use for ZSL training.')
-    parser.add_argument('--datasets', default=config.datasets,
-                        help='Name of datasets to use for ZSL training.')
-    args, rest = parser.parse_known_args()
-
-    datasets = args.datasets.split(',')
-    generate_config(parsed_model=args.model, parsed_datasets=datasets)
+    parser.add_argument('--datasets', default=default.datasets,
+                        help='Comma-separated list of names of datasets to use for ZSL training.')
+    parser.add_argument('--modalities', default=default.modalities,
+                        help='Comma-separated list of modalities (e.g. "img,cls_attr") to use for ZSL training.')
+    parser.add_argument('--img-net', default=default.img_net,
+                        help='Name of the network to use for images embeddings extraction.')
+    parser.add_argument('--cls_attr_net', default=default.cls_attr_net,
+                        help='Name of the network to use for class attributes embeddings extraction.')
+    parser.add_argument('--load-dataset-precomputed-embeddings', action='store_true', default=default.load_dataset_precomputed_embeddings,
+                        help='Whether to load precomputed embeddings for datasets.')
+    # TODO: complete parsing of arguments with default values from config.py
 
     # place here other arguments, that are not in config.py if necessary
 
@@ -51,8 +57,28 @@ def load_arguments():
     """
     parser = init_arguments()
     args = parser.parse_args()
+    args = split_commasep_arguments(args)
     check_arguments(args)
     return args
+
+
+def split_commasep_arguments(args):
+    args_dict = vars(args)
+    for key, value in args_dict.items():
+        try:
+            value = value.split(',')
+        except: continue
+        if len(value) == 1:
+            value = value[0]
+        args_dict[key] = value 
+    return args
+
+
+def load_configurations(args):
+
+    return generate_config(parsed_model=args.model, 
+                           parsed_datasets=args.datasets)
+
 #endregion
 
 
@@ -66,22 +92,25 @@ def load_embeddings(load_dir):
 
 def main():
     args = load_arguments()
+    model_config, datasets_config = load_configurations(args)
 
     #region DATA LOADING
-    datasets = []
-    for dataset_name in config.datasets:
+    datasets = {}
+    for dataset_name, config in datasets_config:
         # dataset_dict contains modalities names as keys and data as values
         dataset_dict = load_dataset(dataset_name, 
-                                    modalities=config.modalities, 
-                                    path=config[dataset_name].path,
-                                    load_embeddings=config.load_dataset_precomputed_embeddings)
-        datasets.append(dataset_dict)
+                                    modalities=args.modalities, 
+                                    path=config.path,
+                                    load_embeddings=args.load_dataset_precomputed_embeddings)
+        datasets[dataset_name] = dataset_dict
     #endregion
 
 
     #region DATA EMBEDDINGS EXTRACTION
-    embeddings = []
-    if not config.load_dataset_precomputed_embeddings:
+    if config.load_dataset_precomputed_embeddings:
+        embeddings = copy.deepcopy(datasets)
+    else:
+        embeddings = []
         for dataset in datasets:
             extractor = ModalitiesFeatureExtractor(modalities_dict=dataset)
             dataset_embeddings = extractor.compute_embeddings()
@@ -90,11 +119,11 @@ def main():
 
 
     #region OBJ EMBEDDINGS READING/CACHING
-    if config.load_cached_obj_embeddings:
-        pass  # TODO: load cached objects embeddings
+    # if config.load_cached_obj_embeddings:
+    #     pass  # TODO: load cached objects embeddings
     
-    if config.cache_obj_embeddings:
-        pass  # TODO: cache computed embeddings on the disk
+    # if config.cache_obj_embeddings:
+    #     pass  # TODO: cache computed embeddings on the disk
     #endregion
 
 

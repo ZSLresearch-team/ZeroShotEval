@@ -25,33 +25,33 @@ from easydict import EasyDict as edict
 
 
 #region GLOBAL DEFAULT CONFIGS
-config = edict()
+default = edict()
 
-config.modalities = ['img', 'cls_attr']
-config.img_net = 'resnet101'
-config.cls_attr_net = 'word2vec'
+default.model = 'cada_vae'
+default.datasets = 'cub,awa2'
 
-config.load_dataset_precomputed_embeddings = True
-config.load_cached_obj_embeddings = False
-config.cache_obj_embeddings = True  # recommended always True
+default.modalities = 'img,cls_attr'
+default.img_net = 'resnet101'
+default.cls_attr_net = 'word2vec'
 
-config.model = 'cada_vae'
-config.datasets = ['cub']
+default.load_dataset_precomputed_embeddings = True
+# default.load_cached_obj_embeddings = False
+# default.cache_obj_embeddings = True  # recommended always True
 
-config.compute_train_zsl_embeddings = True
+default.compute_train_zsl_embeddings = True
 #endregion
 
 
 #region MODEL CONFIGS
 model = edict()
 
-model.general_hyper = edict()  # general hyper for all models
-model.general_hyper.device = "cpu"
-model.general_hyper.num_shots = 0
-model.general_hyper.generalized = True
-model.general_hyper.batch_size = 32
-model.general_hyper.nepoch = 100
-model.general_hyper.fp16_train_mode = False  # for GPUs with tensor cores
+model.general_parameters = edict()  # general hyper for all models
+model.general_parameters.device = "cpu"
+model.general_parameters.num_shots = 0
+model.general_parameters.generalized = True
+model.general_parameters.batch_size = 32
+model.general_parameters.nepoch = 100
+model.general_parameters.fp16_train_mode = False  # for GPUs with tensor cores
 
 
 #region CADA_VAE CONFIGS
@@ -156,26 +156,13 @@ dataset.awa2.dataset_name = "awa2"
 #endregion
 
 
-#region DEFAULT CONFIGS
-default = edict()
-
-default.model = "cada_vae"
-default.dataset = "cub"
-default.class_embedding = "description_emb"
-default.object_embedding = "resnet101"
-#endregion
-
-
 def generate_config(parsed_model, parsed_datasets):
-    for key, value in model[parsed_model].items():
-        config[key] = value
-    # for key, value in dataset[parsed_datasets].items():
-    #     config[key] = value
-    for _dataset in parsed_datasets:
-        config[_dataset] = edict()
-        for key, value in dataset[_dataset].items():
-            config[_dataset][key] = value
-    for key, value in model.general_hyper.items():
-        config[key] = value
-    config.model = parsed_model
-    config.datasets = parsed_datasets
+    specific_model = model[parsed_model]
+    for key, value in model.general_parameters.items():
+        specific_model[key] = value
+
+    datasets = {}
+    for dataset_name in parsed_datasets:
+        datasets[dataset_name] = dataset[dataset_name]
+
+    return specific_model, datasets
