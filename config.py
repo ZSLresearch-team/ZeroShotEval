@@ -65,7 +65,8 @@ model.cada_vae.specific_parameters = edict()
 model.cada_vae.specific_parameters.lr_gen_model = 0.00015
 model.cada_vae.specific_parameters.loss = 'l1'
 model.cada_vae.specific_parameters.latent_size = 64
-model.cada_vae.specific_parameters.lr_cls = 0.001
+
+model.cada_vae.specific_parameters.lr_cls = 0.001  # NOTE: probably for classification task only
 model.cada_vae.specific_parameters.cls_train_epochs = 100  # early stopping nepoch стоит изменить
 model.cada_vae.specific_parameters.auxiliary_data_source = 'attributes'  # для общности следует переделать эту и связанные части
 
@@ -103,6 +104,7 @@ model.cada_vae.specific_parameters.warmup.distance.factor = 8.13
 model.cada_vae.specific_parameters.warmup.distance.end_epoch = 22
 model.cada_vae.specific_parameters.warmup.distance.start_epoch = 6
 
+# NOTE: parameter below is for classification task only
 model.cada_vae.specific_parameters.cls_train_steps = 29  # TODO: transfer auto selection from original repo
 #endregion
 

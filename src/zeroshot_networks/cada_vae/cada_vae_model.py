@@ -11,72 +11,48 @@ import torch.optim as optim
 import torch.autograd as autograd
 from torch.utils import data
 from src.zeroshot_networks.cada_vae.vae_networks import EncoderTemplate, DecoderTemplate
-from src.dataset_loaders.cub_awa_sun_emb_loader import DATA_LOADER as dataloader
 # endregion
 
 
 class Model(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, modalities, feature_dimensions):
         super(Model, self).__init__()
 
-        # region HYPERPARAMETERS ASSIGNMENT
+        # region MODEL HYPERPARAMETERS ASSIGNMENT
         self.device = config.device
-        self.auxiliary_data_source = config.specific_parameters.auxiliary_data_source
-        self.all_data_sources = ['resnet_features', self.auxiliary_data_source]
-        self.dataset = config.dataset_name
-        # for Few-Shot Learning only, else equals 0
-        self.num_shots = config.num_shots
-        self.latent_size = config.specific_parameters.latent_size
         self.batch_size = config.batch_size
+        self.nepoch = config.nepoch
+        self.num_shots = config.num_shots  # for Few-Shot Learning only, else equals 0
+
+        self.modalities = modalities
+        
+        self.latent_size = config.specific_parameters.latent_size
         self.hidden_size_rule = config.specific_parameters.hidden_size_rule
         self.warmup = config.specific_parameters.warmup
-        # boolean param for GZSL
-        self.generalized = config.generalized
-        self.classifier_batch_size = 32
-        self.img_seen_samples = config.samples_per_class[0]  # TODO: integrate multiple datasets support
-        self.att_seen_samples = config.samples_per_class[1]
-        self.att_unseen_samples = config.samples_per_class[2]
-        self.img_unseen_samples = config.samples_per_class[3]
         self.reco_loss_function = config.specific_parameters.loss
-        self.nepoch = config.nepoch
-        self.lr_cls = config.specific_parameters.lr_cls
         self.cross_reconstruction = config.specific_parameters.warmup.cross_reconstruction
-        self.cls_train_epochs = config.specific_parameters.cls_train_steps
         # endregion
 
-        # region DATASET LOADING
-        self.dataset = dataloader(self.dataset,
-                                  copy.deepcopy(self.auxiliary_data_source),
-                                  device=self.device)
-        # endregion
-
-        if self.dataset == 'cub':
-            self.num_classes = 200
-            self.num_novel_classes = 50
-        elif self.dataset == 'sun':
-            self.num_classes = 717
-            self.num_novel_classes = 72
-        elif self.dataset == 'awa1' or self.dataset == 'awa2':
-            self.num_classes = 50
-            self.num_novel_classes = 10
-
-        feature_dimensions = [2048, self.dataset.aux_data.size(1)]
+        # TODO: make all chackings on data loading/preparation stage (training.py)
+        if len(feature_dimensions) > 2 \
+            or len(modalities) > 2:
+            raise ValueError('You have passed more than 2 modalities or feature dims')
 
         # Here, the encoders and decoders for all modalities are created and put into dict
         self.encoder = {}
-        for datatype, dim in zip(self.all_data_sources, feature_dimensions):
+        for datatype, dim in zip(self.modalities, feature_dimensions):
             self.encoder[datatype] = EncoderTemplate(
                 dim, self.latent_size, self.hidden_size_rule[datatype], self.device)
             print(str(datatype) + ' ' + str(dim))
 
         self.decoder = {}
-        for datatype, dim in zip(self.all_data_sources, feature_dimensions):
+        for datatype, dim in zip(self.modalities, feature_dimensions):
             self.decoder[datatype] = DecoderTemplate(
                 self.latent_size, dim, self.hidden_size_rule[datatype], self.device)
 
         # An optimizer for all encoders and decoders is defined here
         parameters_to_optimize = list(self.parameters())
-        for datatype in self.all_data_sources:
+        for datatype in self.modalities:
             parameters_to_optimize += list(self.encoder[datatype].parameters())
             parameters_to_optimize += list(self.decoder[datatype].parameters())
 
@@ -88,6 +64,8 @@ class Model(nn.Module):
 
         elif self.reco_loss_function == 'l1':
             self.reconstruction_criterion = nn.L1Loss(size_average=False)
+
+        model.to(config.device)
 
     def reparameterize(self, mu, logvar):
         if self.reparameterize_with_noise:
@@ -105,18 +83,18 @@ class Model(nn.Module):
         # features
         ##############################################
 
-        mu_img, logvar_img = self.encoder['resnet_features'](img)
+        mu_img, logvar_img = self.encoder[self.modalities[0]](img)
         z_from_img = self.reparameterize(mu_img, logvar_img)
 
-        mu_att, logvar_att = self.encoder[self.auxiliary_data_source](att)
+        mu_att, logvar_att = self.encoder[self.modalities[1]](att)
         z_from_att = self.reparameterize(mu_att, logvar_att)
 
         ##############################################
         # Reconstruct inputs
         ##############################################
 
-        img_from_img = self.decoder['resnet_features'](z_from_img)
-        att_from_att = self.decoder[self.auxiliary_data_source](z_from_att)
+        img_from_img = self.decoder[self.modalities[0]](z_from_img)
+        att_from_att = self.decoder[self.modalities[1]](z_from_att)
 
         reconstruction_loss = self.reconstruction_criterion(img_from_img, img) \
                               + self.reconstruction_criterion(att_from_att, att)
@@ -124,8 +102,8 @@ class Model(nn.Module):
         ##############################################
         # Cross Reconstruction Loss
         ##############################################
-        img_from_att = self.decoder['resnet_features'](z_from_att)
-        att_from_img = self.decoder[self.auxiliary_data_source](z_from_img)
+        img_from_att = self.decoder[self.modalities[0]](z_from_att)
+        att_from_img = self.decoder[self.modalities[1]](z_from_img)
 
         cross_reconstruction_loss = self.reconstruction_criterion(img_from_att, img) \
                                     + self.reconstruction_criterion(att_from_img, att)
@@ -181,14 +159,14 @@ class Model(nn.Module):
 
         return loss.item()
 
-    def fit(self):
+    def fit(self, dataset):
         losses = []
 
         self.dataloader = data.DataLoader(
-            self.dataset, batch_size=self.batch_size, shuffle=True, drop_last=True)  # ,num_workers = 4)
+            dataset, batch_size=self.batch_size, shuffle=True, drop_last=True)  # ,num_workers = 4)
 
-        self.dataset.novelclasses = self.dataset.novelclasses.long()
-        self.dataset.seenclasses = self.dataset.seenclasses.long()
+        dataset.novelclasses = dataset.novelclasses.long()
+        dataset.seenclasses = dataset.seenclasses.long()
         # leave both statements
         self.train()
         self.reparameterize_with_noise = True
@@ -198,10 +176,10 @@ class Model(nn.Module):
             self.current_epoch = epoch
 
             i = -1
-            for iters in range(0, self.dataset.ntrain, self.batch_size):
+            for iters in range(0, dataset.ntrain, self.batch_size):
                 i += 1
 
-                label, data_from_modalities = self.dataset.next_batch(
+                label, data_from_modalities = dataset.next_batch(
                     self.batch_size)
 
                 label = label.long().to(self.device)
@@ -235,7 +213,7 @@ class Model(nn.Module):
         print('\nComputing ZSL embeddings for test data...')
         iter_idx = 0
         embeddings = torch.Tensor()
-        for batch in self.dataset.gen_next_batch(self.batch_size, dset_part='test'):
+        for batch in dataset.gen_next_batch(self.batch_size, dset_part='test'):
             iter_idx += 1
             label, data_from_modalities = batch
 
@@ -244,7 +222,7 @@ class Model(nn.Module):
                 data_from_modalities[j] = data_from_modalities[j].to(
                     self.device)
             
-            mu_att, logvar_att = self.encoder[self.auxiliary_data_source](data_from_modalities[1])
+            mu_att, logvar_att = self.encoder[self.modalities[1]](data_from_modalities[1])
             z_from_att = self.reparameterize(mu_att, logvar_att)
 
             embeddings = torch.cat((embeddings, z_from_att), 0)
