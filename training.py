@@ -1,39 +1,57 @@
 """Main script-launcher for training of ZSL models.
 """
 
-# TODO: replace all template variables with actual values
-# after completing all modules
 
-
-#region IMPORTS
+# region IMPORTS
 import argparse
+import os
 import sys
+import copy
+import pickle
+import numpy as np
+import pandas as pd
+from pathlib import Path
 
-from config import config, default, generate_config
+from config import default
+from config import generate_config
 
 from src.dataset_loaders.data_loader import load_dataset
-from src.modalities_feature_extractors.modalities_feature_extractor import ModalitiesFeatureExtractor
+from src.modalities_feature_extractors.modalities_feature_extractor import compute_embeddings
 from src.zeroshot_networks.cada_vae.cada_vae_model import Model as CadaVaeModel
 
 # TODO: from gan_net import gan_model
-#endregion
+# endregion
 
 
-#region ARGUMENTS
+# region ARGUMENTS PROCESSING
 def init_arguments():
     """Initialize arguments replacing the default ones.
     """
-    parser = argparse.ArgumentParser(description='Main script-launcher for training of ZSL models')
-    
-    # general configs
-    parser.add_argument('--model', default=config.model,
-                        help='Name of model to use for ZSL training.')
-    parser.add_argument('--datasets', default=config.datasets,
-                        help='Name of datasets to use for ZSL training.')
-    args, rest = parser.parse_known_args()
+    parser = argparse.ArgumentParser(
+        description='Main script-launcher for training of ZSL models')
 
-    datasets = args.datasets.split(',')
-    generate_config(parsed_model=args.model, parsed_datasets=datasets)
+    general_args = parser.add_argument_group(title='General configs')
+    general_args.add_argument('--model', default=default.model,
+                              help='Name of model to use for ZSL training.')
+    general_args.add_argument('--datasets', default=default.datasets,
+                              help='Comma-separated list of names of datasets to use for ZSL training.')
+    general_args.add_argument('--modalities', default=default.modalities,
+                              help='Comma-separated list of modalities (e.g. "img,cls_attr") to use for ZSL training.')
+    general_args.add_argument('--generalized-zsl', action='store_true', default=default.generalized_zsl,
+                              help='Whether to perform Generalized ZSL training.')
+
+    nets_args = parser.add_argument_group(title='Networks configs')
+    nets_args.add_argument('--img-net', default=default.img_net,
+                           help='Name of the network to use for images embeddings extraction.')
+    nets_args.add_argument('--cls-attr-net', default=default.cls_attr_net,
+                           help='Name of the network to use for class attributes embeddings extraction.')
+
+    saveload_args = parser.add_argument_group(
+        title='Configs for saving/loading')
+    saveload_args.add_argument('--saved-obj-embeddings-path', default=default.saved_obj_embeddings_path,
+                               help='Path to stored object embeddings to load')
+    saveload_args.add_argument('--obj-embeddings-save-path', default=default.obj_embeddings_save_path,
+                               help='Path to save computed embeddings.')
 
     # place here other arguments, that are not in config.py if necessary
 
@@ -51,80 +69,250 @@ def load_arguments():
     """
     parser = init_arguments()
     args = parser.parse_args()
+    args = split_commasep_arguments(args)
     check_arguments(args)
+
+    # TODO: process all paths in a loop
+    args.saved_obj_embeddings_path = Path(args.saved_obj_embeddings_path)
+    args.obj_embeddings_save_path = Path(args.obj_embeddings_save_path)
+
     return args
-#endregion
 
 
-def save_embeddings(save_dir):
-    pass
+def split_commasep_arguments(args):
+    args_dict = vars(args)
+    for key, value in args_dict.items():
+        try:
+            value = value.split(',')
+        except:
+            continue
+        if len(value) == 1:
+            value = value[0]
+        args_dict[key] = value
+    return args
+
+
+def load_configurations(args):
+    return generate_config(parsed_model=args.model,
+                           parsed_datasets=args.datasets)
+# endregion
+
+
+# region SAVING/LOADING COMPUTED DATA
+def save_embeddings(embeddings, labels, splits, save_dir):
+    print('\n[info] Saving all data to "{}"'.format(save_path))
+    for dataset_name in embeddings:
+        embs_path = save_dir / (dataset_name + '_obj_embeddings.pickle')
+        lab_path = save_dir / (dataset_name + '_obj_labels.pickle')
+        splits_path = save_dir / (dataset_name + '_splits.csv')
+
+        print('Saving embeddings to "{}"'.format(embs_path))
+        with open(embs_path, 'wb') as f:
+            pickle.dump(embeddings[dataset_name], f)
+        
+        print('Saving labels to "{}"'.format(lab_path))
+        with open(lab_path, 'wb') as f:
+            pickle.dump(labels[dataset_name], f)
+
+        if splits[dataset_name]:  # if splits are defined for the dataset
+            print('Save data splits to "{}"'.format(splits_path))
+            splits[dataset_name].to_csv(splits_path, index=False)
+
+    print('Done!')
 
 
 def load_embeddings(load_dir):
-    pass
+    print('[INFO] Loading computed embeddings and data splits from "{}"...'.format(
+        load_dir), end=' ')
+    embeddings_dict = {}
+    dataset_labels = {}
+    dataset_splits = {}
+    for filename in os.listdir(load_dir):
+        path = os.path.join(load_dir, filename)
+        if filename.endswith('_obj_embeddings.pickle'):
+            dataset_name = filename.rsplit('_', 2)[0]
+            with open(path, 'rb') as f:
+                embeddings = pickle.load(f)
+            embeddings_dict[dataset_name] = embeddings
+        
+        elif filename.endswith('_obj_labels.pickle'):
+            dataset_name = filename.rsplit('_', 2)[0]
+            with open(path, 'rb') as f:
+                labels = pickle.load(f)
+            dataset_labels[dataset_name] = labels
+
+        elif filename.endswith('_splits.csv'):
+            dataset_name = filename.rsplit('_', 1)[0]
+            splits_df = pd.read_csv(path)
+            dataset_splits[dataset_name] = splits_df
+
+    if not dataset_splits:  # if there are no predefined splits for this dataset
+        dataset_splits = None
+    print('Done!')
+    return embeddings_dict, dataset_labels, dataset_splits
+# endregion
+
+
+# region DATA PROCESSING
+def split_dataset(modalities_dict, splits_df):
+    train_df = splits_df.loc[splits_df['is_train'] == 1].astype(int)
+    test_unseen_df = splits_df.loc[(splits_df['is_train'] == 0) & (
+        splits_df['is_seen'] == 0)].astype(int)
+    test_seen_df = splits_df.loc[(splits_df['is_train'] == 0) & (
+        splits_df['is_seen'] == 1)].astype(int)
+
+    train_data = {}
+    test_unseen_data = {}
+    test_seen_data = {}
+    for dataset_name, data_array in modalities_dict.items():
+        # NOTE: here is an assumption that in data_array ids are arranged in ascending order
+        # in other case it can be a weak point for bugs
+        train_data[dataset_name] = data_array[train_df['obj_id'].values]
+        test_unseen_data[dataset_name] = data_array[test_unseen_df['obj_id'].values]
+        test_seen_data[dataset_name] = data_array[test_seen_df['obj_id'].values]
+    if test_seen_df.empty:
+        test_seen_data = None
+    return train_data, test_unseen_data, test_seen_data
+
+
+def check_loaded_modalities(data_dict, modalities):
+    for dataset_name, data in data_dict.items():
+        keys = set(data.keys())
+        modalities = set(modalities)
+        if not modalities.issubset(keys):
+            raise ValueError('You have specified modalities that are not presented in dataset!\
+                                \nAvaliable modalities for {} dataset: {}'.format(dataset_name, keys))
+
+
+def filter_modalities(data_dict, modalities):
+    check_loaded_modalities(data_dict, modalities)
+    filtered_dict = copy.deepcopy(data_dict)
+    for dataset_name, data in data_dict.items():
+        for key in data:
+            if key not in modalities:
+                filtered_dict[dataset_name].pop(key)
+    return filtered_dict
+
+
+def extend_cls_attributes(data_dict, labels):
+    for dataset_name, data in data_dict.items():
+        counts_list = []
+        labels_set = []
+        for label in labels[dataset_name].tolist():
+            if label not in labels_set:
+                counts_list.append(labels[dataset_name].tolist().count(label))
+                labels_set.append(label)
+
+        cls_attr_list = []
+        for attr, count in zip(data['cls_attr'].tolist(), counts_list):
+            cls_attr_list.extend([attr for _ in range(count)])
+        data_dict[dataset_name]['cls_attr'] = np.array(cls_attr_list)
+    return data_dict
+
+
+def get_data_dimensions(modalities_dict):
+    dims = {}
+    for modality_name, data in modalities_dict.items():
+        if isinstance(data, np.ndarray):
+            dims[modality_name] = data.shape
+        elif isinstance(data, list):
+            dims[modality_name] = len(data)
+        else:
+            raise NotImplementedError(
+                'Please write a way to get dimension for {}'.format(type(data)))
+        pass
+    return dims
+# endregion
 
 
 def main():
     args = load_arguments()
+    model_config, datasets_config = load_configurations(args)
 
-    #region DATA LOADING
-    datasets = []
-    for dataset_name in config.datasets:
-        # dataset_dict contains modalities names as keys and data as values
-        dataset_dict = load_dataset(dataset_name, 
-                                    modalities=config.modalities, 
-                                    path=config[dataset_name].path,
-                                    load_embeddings=config.load_dataset_precomputed_embeddings)
-        datasets.append(dataset_dict)
-    #endregion
+    print('\n========== DATA LOADING ==========\n')
+    if not args.saved_obj_embeddings_path:
 
+        # region DATA LOADING
+        datasets = {}
+        datasets_labels = {}
+        datasets_splits = {}
+        for dataset_name, config in datasets_config.items():
+            # modalities_dict contains modalities names as keys and data as values
+            modalities_dict, labels, splits_df = load_dataset(dataset_name,
+                                                              modalities=args.modalities,
+                                                              path=config.path)
+            datasets[dataset_name] = modalities_dict
+            datasets_labels[dataset_name] = labels 
+            datasets_splits[dataset_name] = splits_df
+        # endregion
 
-    #region DATA EMBEDDINGS EXTRACTION
-    embeddings = []
-    if not config.load_dataset_precomputed_embeddings:
-        for dataset in datasets:
-            extractor = ModalitiesFeatureExtractor(modalities_dict=dataset)
-            dataset_embeddings = extractor.compute_embeddings()
-            embeddings.append(dataset_embeddings)
-    #endregion
+        # region DATA OBJ EMBEDDINGS EXTRACTION
+        embeddings = {}
+        for dataset_name, data in datasets.items():
+            dataset_embeddings = compute_embeddings(modalities_dict=data)
+            embeddings[dataset_name] = dataset_embeddings
+        # endregion
 
+        # region OBJ EMBEDDINGS SAVING
+        if args.obj_embeddings_save_path:
+            save_embeddings(embeddings=embeddings,
+                            labels=datasets_labels,
+                            splits=datasets_splits,
+                            save_dir=args.obj_embeddings_save_path)
+        # endregion
 
-    #region OBJ EMBEDDINGS READING/CACHING
-    if config.load_cached_obj_embeddings:
-        pass  # TODO: load cached objects embeddings
-    
-    if config.cache_obj_embeddings:
-        pass  # TODO: cache computed embeddings on the disk
-    #endregion
+    # region OBJ EMBEDDINGS READING/SAVING
+    if args.saved_obj_embeddings_path:
+        embeddings, datasets_labels, datasets_splits = load_embeddings(
+            load_dir=args.saved_obj_embeddings_path)
+    # endregion
 
+    # region MODALITIES PREPARATION
+    embeddings = filter_modalities(embeddings, args.modalities)
+    embeddings = extend_cls_attributes(embeddings, datasets_labels)
+    # endregion
 
-    #region ZERO-SHOT MODELS TRAINING / INFERENCE
+    # region ZERO-SHOT MODELS TRAINING / INFERENCE
+    for dataset_name, dataset_embeddings in embeddings.items():
+        # TODO: add loop for regenerating splits and retraining ZSL net
+        splits_df = datasets_splits[dataset_name]
+        if splits_df is None:
+            # TODO: !!! Do not forget to handle GZSL parameter and make additional data split
+            splits_df = generate_splits()
 
-    # NOTE: don't forget to handle multiple datasets!
-    if args.model == 'cada_vae':
-        model = CadaVaeModel(config)
-        model.to(config.device)
+        train_embeddings, test_unseen_embeddings, test_seen_embeddings = split_dataset(
+            modalities_dict=dataset_embeddings, splits_df=splits_df)
 
-        model.fit()
+        modalities_dimensions = get_data_dimensions(train_embeddings)
 
-    elif args.model == 'clswgan':
-        pass  # TODO: initialize the model with configs
+        # NOTE: now all loaded modalities are passed to the model, but
+        # it shouldn't be a restriction! There can be a situation, where we want to
+        # compare two different models, that are trained on different modalities
+        if args.model == 'cada_vae':
+            model = CadaVaeModel(config=model_config,
+                                 modalities=args.modalities,
+                                 feature_dimensions=modalities_dimensions)
+            model.to(model_config.device)
+            model.fit(train_embeddings)
 
-    else:
-        raise NotImplementedError('Unknown network')
+        elif args.model == 'clswgan':
+            pass  # TODO: initialize the model with configs
 
-    zsl_embeddings = model.transform()
-    if config.compute_zsl_train_embeddings:
-        zsl_train_embeddings = model.transform()
-    #endregion
+        else:
+            raise NotImplementedError('Unknown network')
 
+        zsl_unseen_embeddings = model.transform(test_unseen_embeddings)
+        zsl_seen_embeddings = model.transform(test_seen_embeddings)
 
-    #region ZSL EMBEDDINGS CACHING
+        if args.compute_zsl_train_embeddings:
+            zsl_train_embeddings = model.transform(train_embeddings)
+    # endregion
+
+    # region ZSL EMBEDDINGS CACHING
     if config.cache_zsl_embeddings:
         pass  # TODO: cache computed embeddings on the disk
-    #endregion
+    # endregion
 
 
 if __name__ == '__main__':
     main()
-    
