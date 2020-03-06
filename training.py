@@ -9,12 +9,13 @@
 import argparse
 import sys
 import copy
+import pickle
 
 from config import default 
 from config import generate_config
 
 from src.dataset_loaders.data_loader import load_dataset
-from src.modalities_feature_extractors.modalities_feature_extractor import ModalitiesFeatureExtractor
+from src.modalities_feature_extractors.modalities_feature_extractor import compute_embeddings
 from src.zeroshot_networks.cada_vae.cada_vae_model import Model as CadaVaeModel
 
 # TODO: from gan_net import gan_model
@@ -27,20 +28,25 @@ def init_arguments():
     """
     parser = argparse.ArgumentParser(description='Main script-launcher for training of ZSL models')
     
-    # general configs
-    parser.add_argument('--model', default=default.model,
+    general_args = parser.add_argument_group(title='General configs')
+    general_args.add_argument('--model', default=default.model,
                         help='Name of model to use for ZSL training.')
-    parser.add_argument('--datasets', default=default.datasets,
+    general_args.add_argument('--datasets', default=default.datasets,
                         help='Comma-separated list of names of datasets to use for ZSL training.')
-    parser.add_argument('--modalities', default=default.modalities,
+    general_args.add_argument('--modalities', default=default.modalities,
                         help='Comma-separated list of modalities (e.g. "img,cls_attr") to use for ZSL training.')
-    parser.add_argument('--img-net', default=default.img_net,
+    
+    nets_args = parser.add_argument_group(title='Networks configs')
+    nets_args.add_argument('--img-net', default=default.img_net,
                         help='Name of the network to use for images embeddings extraction.')
-    parser.add_argument('--cls_attr_net', default=default.cls_attr_net,
+    nets_args.add_argument('--cls-attr-net', default=default.cls_attr_net,
                         help='Name of the network to use for class attributes embeddings extraction.')
-    parser.add_argument('--load-dataset-precomputed-embeddings', action='store_true', default=default.load_dataset_precomputed_embeddings,
-                        help='Whether to load precomputed embeddings for datasets.')
-    # TODO: complete parsing of arguments with default values from config.py
+    
+    saveload_args = parser.add_argument_group(title='Configs for saving/loading')
+    saveload_args.add_argument('--saved-obj-embeddings-path', default=default.saved_obj_embeddings_path,
+                        help='Path to stored object embeddings to load')
+    saveload_args.add_argument('--obj-embeddings-save-path', default=default.obj_embeddings_save_path,
+                        help='Path to save computed embeddings.')
 
     # place here other arguments, that are not in config.py if necessary
 
@@ -82,12 +88,21 @@ def load_configurations(args):
 
 
 #region SAVING/LOADING COMPUTED DATA
-def save_embeddings(save_dir):
-    pass
+def save_embeddings(save_path, embeddings):
+    assert os.path.splitext(save_path)[1] == '.pickle'
+    print('Saving embeddings to "{}"'.format(save_path))
+    with open(save_path, 'wb') as f:
+        pickle.dump(embeddings, f)
+    print('Done!')
 
 
-def load_embeddings(load_dir):
-    pass
+def load_embeddings(load_path):
+    assert os.path.splitext(load_path)[1] == '.pickle'
+    print('Loading embeddings from "{}"'.format(load_path))
+    with open(load_path, 'rb') as f:
+        embeddings = pickle.load(f)
+    print('Done!')
+    return embeddings
 #endregion
 
 
@@ -118,38 +133,41 @@ def main():
     args = load_arguments()
     model_config, datasets_config = load_configurations(args)
 
-    #region DATA LOADING
-    datasets = {}
-    datasets_splits = {}  # NOTE: !!! Do not forget to handle GZSL parameter and make additional data split
-    for dataset_name, config in datasets_config.items():
-        # modalities_dict contains modalities names as keys and data as values
-        modalities_dict, splits_df = load_dataset(dataset_name, 
-                                                  modalities=args.modalities, 
-                                                  path=config.path,
-                                                  load_embeddings=args.load_dataset_precomputed_embeddings)
-        datasets[dataset_name] = modalities_dict
-        datasets_splits[dataset_name] = splits_df
-    #endregion
+    if not args.saved_obj_embeddings_path:
+
+        #region DATA LOADING
+        print('\n----- DATA LOADING -----\n')
+        datasets = {}
+        datasets_splits = {}
+        for dataset_name, config in datasets_config.items():
+            # modalities_dict contains modalities names as keys and data as values
+            modalities_dict, splits_df = load_dataset(dataset_name, 
+                                                      modalities=args.modalities, 
+                                                      path=config.path)
+            datasets[dataset_name] = modalities_dict
+            datasets_splits[dataset_name] = splits_df
+            # NOTE: !!! Do not forget to handle GZSL parameter and make additional data split
+        #endregion
 
 
-    #region DATA EMBEDDINGS EXTRACTION
-    if args.load_dataset_precomputed_embeddings:
-        embeddings = copy.deepcopy(datasets)
-    else:
+        #region DATA OBJ EMBEDDINGS EXTRACTION
         embeddings = {}
         for dataset_name, data in datasets.items():
-            extractor = ModalitiesFeatureExtractor(modalities_dict=data)
-            dataset_embeddings = extractor.compute_embeddings()
+            dataset_embeddings = compute_embeddings(modalities_dict=data)
             embeddings[dataset_name] = dataset_embeddings
-    #endregion
+        #endregion
 
 
-    #region OBJ EMBEDDINGS READING/CACHING
-    # if config.load_cached_obj_embeddings:
-    #     pass  # TODO: load cached objects embeddings
-    
-    # if config.cache_obj_embeddings:
-    #     pass  # TODO: cache computed embeddings on the disk
+        #region OBJ EMBEDDINGS SAVING
+        if args.obj_embeddings_save_path:
+            save_embeddings(save_path=args.obj_embeddings_save_path,
+                            embeddings=embeddings)
+        #endregion
+
+
+    #region OBJ EMBEDDINGS READING/SAVING
+    if args.saved_obj_embeddings_path:
+        embbeddings = load_embeddings(load_path=args.saved_obj_embeddings_path)
     #endregion
 
 

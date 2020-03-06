@@ -34,9 +34,8 @@ default.modalities = 'img,cls_attr'
 default.img_net = 'resnet101'
 default.cls_attr_net = 'word2vec'
 
-default.load_dataset_precomputed_embeddings = True
-# default.load_cached_obj_embeddings = False
-# default.cache_obj_embeddings = True  # recommended always True
+default.saved_obj_embeddings_path = ''  # path to stored object embeddings to load
+default.obj_embeddings_save_path = ''  # path to save computed embeddings
 
 default.compute_train_zsl_embeddings = True
 #endregion
