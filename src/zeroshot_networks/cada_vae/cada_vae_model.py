@@ -18,6 +18,8 @@ class Model(nn.Module):
     def __init__(self, config, modalities, feature_dimensions):
         super(Model, self).__init__()
 
+        self.ntrain = feature_dimensions['img'][0]  # TODO: remove this
+
         # region MODEL HYPERPARAMETERS ASSIGNMENT
         self.device = config.device
         self.batch_size = config.batch_size
@@ -33,10 +35,12 @@ class Model(nn.Module):
         self.cross_reconstruction = config.specific_parameters.warmup.cross_reconstruction
         # endregion
 
-        # TODO: make all chackings on data loading/preparation stage (training.py)
+        # TODO: make all checkings on data loading/preparation stage (training.py)
         if len(feature_dimensions) > 2 \
             or len(modalities) > 2:
             raise ValueError('You have passed more than 2 modalities or feature dims')
+        
+        feature_dimensions = [feature_dimensions[key][1] for key in modalities]
 
         # Here, the encoders and decoders for all modalities are created and put into dict
         self.encoder = {}
@@ -64,8 +68,6 @@ class Model(nn.Module):
 
         elif self.reco_loss_function == 'l1':
             self.reconstruction_criterion = nn.L1Loss(size_average=False)
-
-        model.to(config.device)
 
     def reparameterize(self, mu, logvar):
         if self.reparameterize_with_noise:
@@ -159,30 +161,29 @@ class Model(nn.Module):
 
         return loss.item()
 
-    def fit(self, dataset):
+    def fit(self, data):
         losses = []
 
-        self.dataloader = data.DataLoader(
-            dataset, batch_size=self.batch_size, shuffle=True, drop_last=True)  # ,num_workers = 4)
+        # self.dataloader = data.DataLoader(
+        #     dataset, batch_size=self.batch_size, shuffle=True, drop_last=True)  # ,num_workers = 4)
 
-        dataset.novelclasses = dataset.novelclasses.long()
-        dataset.seenclasses = dataset.seenclasses.long()
+        # dataset.novelclasses = dataset.novelclasses.long()
+        # dataset.seenclasses = dataset.seenclasses.long()
         # leave both statements
         self.train()
         self.reparameterize_with_noise = True
 
-        print('train for reconstruction')
+        print('\ntrain for reconstruction')
         for epoch in range(0, self.nepoch):
             self.current_epoch = epoch
 
             i = -1
-            for iters in range(0, dataset.ntrain, self.batch_size):
+            for iters in range(0, self.ntrain, self.batch_size):
                 i += 1
 
-                label, data_from_modalities = dataset.next_batch(
-                    self.batch_size)
+                data_from_modalities = gen_random_batch(
+                    data, self.batch_size, self.ntrain)
 
-                label = label.long().to(self.device)
                 for j in range(len(data_from_modalities)):
                     data_from_modalities[j] = data_from_modalities[j].to(
                         self.device)
@@ -207,17 +208,16 @@ class Model(nn.Module):
 
         return losses
 
-    def transform(self):
+    def transform(self, data):
         """Inference mode for the model
         """
         print('\nComputing ZSL embeddings for test data...')
         iter_idx = 0
         embeddings = torch.Tensor()
-        for batch in dataset.gen_next_batch(self.batch_size, dset_part='test'):
+        for batch in gen_next_batch(data, self.batch_size):
             iter_idx += 1
-            label, data_from_modalities = batch
+            data_from_modalities = batch
 
-            label = label.long().to(self.device)
             for j in range(len(data_from_modalities)):
                 data_from_modalities[j] = data_from_modalities[j].to(
                     self.device)
@@ -236,3 +236,34 @@ class Model(nn.Module):
         # In current version of CADA-VAE model this functionality is not implemented
         # For full implementation please refer to original code from repo
         # https://github.com/edgarschnfld/CADA-VAE-PyTorch/blob/master/model/data_loader.py
+
+
+# TODO: improve generator and place it not in the model
+# Pass generator to method fit as in Keras
+def gen_next_batch(data, batch_size):
+        
+        features = torch.from_numpy(data['img']).float()
+        attr = torch.from_numpy(data['cls_attr']).float()
+        # labels = torch.from_numpy(labels).long().to(self.device)
+
+        iter_len = len(features) // batch_size + 1
+        for current_batch in range(iter_len):
+            current_idx = current_batch * batch_size
+            end_idx = current_idx + batch_size
+
+            batch_features = features[current_idx:end_idx]
+            # batch_label = labels[current_idx:end_idx]
+            batch_attr = attr[current_idx:end_idx]
+
+            # yield batch_label, [batch_features, batch_attr]
+            yield [batch_features, batch_attr]
+
+def gen_random_batch(data, batch_size, ntrain):
+    idx = torch.randperm(ntrain)[0:batch_size]
+    features = torch.from_numpy(data['img']).float()
+    attr = torch.from_numpy(data['cls_attr']).float()
+    batch_feature = features[idx]
+    # batch_label =  labels[idx]
+    batch_attr = attr[idx]
+    # return batch_label, [batch_feature, batch_attr]
+    return [batch_feature, batch_attr]

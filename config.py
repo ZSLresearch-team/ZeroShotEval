@@ -34,6 +34,8 @@ default.modalities = 'img,cls_attr'
 default.img_net = 'resnet101'
 default.cls_attr_net = 'word2vec'
 
+default.generalized_zsl = True
+
 default.saved_obj_embeddings_path = ''  # path to stored object embeddings to load
 default.obj_embeddings_save_path = ''  # path to save computed embeddings
 
@@ -83,8 +85,8 @@ model.cada_vae.specific_parameters.hidden_layers.sentences = (1450, 665)
 model.cada_vae.specific_parameters.input_features_from_cnn = 2048  # for ResNet101
 
 model.cada_vae.specific_parameters.hidden_size_rule = edict()
-model.cada_vae.specific_parameters.hidden_size_rule.resnet_features = (1560, 1660)
-model.cada_vae.specific_parameters.hidden_size_rule.attributes = (1450, 665)
+model.cada_vae.specific_parameters.hidden_size_rule.img = (1560, 1660)
+model.cada_vae.specific_parameters.hidden_size_rule.cls_attr = (1450, 665)
 model.cada_vae.specific_parameters.hidden_size_rule.sentences = (1450, 665)
 
 model.cada_vae.specific_parameters.warmup = edict()

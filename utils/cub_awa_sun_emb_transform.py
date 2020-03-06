@@ -82,7 +82,7 @@ def read_matattributes(matattrsplit_file, root_path, dataset):
 
 def read_data_splits(matattrsplit_file, root_path):
     print('\nLoading data splits from .mat files...', end=' ')
-    splits_df = pd.DataFrame(columns=['img_id', 'is_train', 'is_seen'])
+    splits_df = pd.DataFrame(columns=['obj_id', 'is_train', 'is_seen'])
 
     matattrsplit = sio.loadmat(os.path.join(root_path, matattrsplit_file))
 
@@ -93,13 +93,13 @@ def read_data_splits(matattrsplit_file, root_path):
 
     # NOTE: there are two more fileds in .mat files that
     # are not in use now, but can be used
-    # train_loc = matcontent['train_loc'].squeeze() - 1  #--> train_feature = TRAIN SEEN
-    # val_unseen_loc = matcontent['val_loc'].squeeze() - 1  #--> test_unseen_feature = TEST UNSEEN
+    # train_loc = matattrsplit['train_loc'].squeeze() - 1  #--> train_feature = TRAIN SEEN
+    # val_unseen_loc = matattrsplit['val_loc'].squeeze() - 1  #--> test_unseen_feature = TEST UNSEEN
 
     for part, params in zip((trainval_loc, test_seen_loc, test_unseen_loc),
                             ((1, 1), (0, 1), (0, 0))):
         part_df = pd.DataFrame(columns=splits_df.columns)
-        part_df.loc[:, 'img_id'] = np.sort(part)
+        part_df.loc[:, 'obj_id'] = np.sort(part)
         part_df.loc[:, 'is_train'] = params[0]
         part_df.loc[:, 'is_seen'] = params[1]
         splits_df = splits_df.append(part_df)
@@ -138,14 +138,9 @@ def load_dataset_embeddings(dataset_name, path,
         matattrsplit_file, root_path=path, dataset=dataset_name)
     splits_df = read_data_splits(matattrsplit_file, root_path=path)
 
-    embeddings_dict = {}
-    embeddings_dict[dataset_name] = {
-        **img_embeddings, **aux_modalities_embeddings}
+    embeddings_dict = {**img_embeddings, **aux_modalities_embeddings}
 
-    labels_dict = {}
-    labels_dict[dataset_name] = labels
-
-    return embeddings_dict, labels_dict, splits_df
+    return embeddings_dict, labels, splits_df
 
 
 def make_directory(path):
@@ -156,8 +151,8 @@ def make_directory(path):
 
 def save_data(embeddings, labels, splits_df, dataset_name, save_dir):
     make_directory(save_dir)
-    embs_path = save_dir / (dataset_name + '_embeddings.pickle')
-    lab_path = save_dir / (dataset_name + '_labels.pickle')
+    embs_path = save_dir / (dataset_name + '_obj_embeddings.pickle')
+    lab_path = save_dir / (dataset_name + '_obj_labels.pickle')
     splits_path = save_dir / (dataset_name + '_splits.csv')
 
     print('\nSaving embeddings to "{}"'.format(embs_path))
