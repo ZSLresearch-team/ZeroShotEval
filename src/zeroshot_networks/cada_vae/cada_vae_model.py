@@ -14,7 +14,7 @@ from src.zeroshot_networks.cada_vae.vae_networks import EncoderTemplate, Decoder
 # endregion
 
 
-class CADAVaeModel(nn.Module):
+class VaeModel(nn.Module):
     """
     Model performs CADA-VAE ZSL approach
 
@@ -32,7 +32,7 @@ class CADAVaeModel(nn.Module):
             {'img': 1024,
             'cls_attr': 312}
         """
-        super(CADAVaeModel, self).__init__()
+        super(VaeModel, self).__init__()
         self.modalities = modalities
 
         self.encoder = {}
@@ -47,8 +47,8 @@ class CADAVaeModel(nn.Module):
     def forward(self, x):
         """
         Returns:
-            z_mu: dictionary mapping modalities names to mean.
-            z_var: dictionary mapping modalities names to z_variance.
+            z_mu: dictionary mapping modalities names to mean layer out.
+            z_var: dictionary mapping modalities names to variance layer out.
             x_recon: dictionary mapping modalities names to decoder out.
         """
         z_mu = {}

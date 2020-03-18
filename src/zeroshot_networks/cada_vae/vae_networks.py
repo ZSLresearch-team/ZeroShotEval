@@ -1,5 +1,4 @@
-"""
-"""
+""""""
 
 # region IMPORTS
 import torch
@@ -8,6 +7,7 @@ import torch.nn as nn
 
 
 def weights_init(m):
+    """Weight init."""
     classname = m.__class__.__name__
     if classname.find('Linear') != -1:
         m.bias.data.fill_(0)
@@ -19,14 +19,19 @@ def weights_init(m):
 
 
 class EncoderTemplate(nn.Module):
-    def __init__(self, input_dim, latent_size, hidden_size_rule, device):
+    """
+    Encoder part for CADA-VAE model.
+
+    Args:
+        input_dim: size of input layer
+        hidden size_rule: list of sizes of hidden layers
+        output_dim: size of output layer
+    """
+
+    def __init__(self, input_dim, hidden_size_rule, output_dim):
         super(EncoderTemplate, self).__init__()
 
-        if len(hidden_size_rule) == 2:
-            self.layer_sizes = [input_dim, hidden_size_rule[0], latent_size]
-        elif len(hidden_size_rule) == 3:
-            self.layer_sizes = [
-                input_dim, hidden_size_rule[0], hidden_size_rule[1], latent_size]
+        self.layer_sizes = [input_dim] + hidden_size_rule + [output_dim]
 
         modules = []
         for i in range(len(self.layer_sizes)-2):
@@ -38,34 +43,48 @@ class EncoderTemplate(nn.Module):
         self.feature_encoder = nn.Sequential(*modules)
 
         self._mu = nn.Linear(
-            in_features=self.layer_sizes[-2], out_features=latent_size)
+            in_features=self.layer_sizes[-2], out_features=output_dim)
 
-        self._logvar = nn.Linear(
-            in_features=self.layer_sizes[-2], out_features=latent_size)
+        self._var = nn.Linear(
+            in_features=self.layer_sizes[-2], out_features=output_dim)
 
         self.apply(weights_init)
 
-        self.to(device)
-
     def forward(self, x):
-        h = self.feature_encoder(x)
-        mu = self._mu(h)
-        logvar = self._logvar(h)
-        return mu, logvar
+        hidden = self.feature_encoder(x)
+        z_mu = self._mu(hidden)
+        z_var = self._var(hidden)
+
+        return z_mu, z_var
 
 
 class DecoderTemplate(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_size_rule, device):
+    """Decoder part for CADA-VAE model.
+
+    Args:
+        input_dim: size of input layer
+        hidden_size_rule: list of sizes of hidden layers
+        output_dim: size of output layer
+    """
+
+    def __init__(self, input_dim, hidden_size_rule, output_dim):
         super(DecoderTemplate, self).__init__()
 
-        self.layer_sizes = [input_dim, hidden_size_rule[-1], output_dim]
+        self.layer_sizes = [input_dim] + hidden_size_rule + [output_dim]
 
-        self.feature_decoder = nn.Sequential(nn.Linear(
-            input_dim, self.layer_sizes[1]), nn.ReLU(), nn.Linear(self.layer_sizes[1], output_dim))
+        # self.feature_decoder = nn.Sequential(
+        #                                      nn.Linear(input_dim, self.layer_sizes[1]),
+        #                                      nn.ReLU(), nn.Linear(self.layer_sizes[1], output_dim))
+        modules = []
+        for i in range(len(self.layer_sizes)-2):
+            modules.append(
+                nn.Linear(self.layer_sizes[i], self.layer_sizes[i+1]))
+            modules.append(nn.ReLU())
+
+        modules.append(nn.Linear(self.layer_sizes[-2], self.layer_sizes[-1]))
+        self.feature_decoder = nn.Sequential(*modules)
 
         self.apply(weights_init)
-
-        self.to(device)
 
     def forward(self, x):
         return self.feature_decoder(x)
