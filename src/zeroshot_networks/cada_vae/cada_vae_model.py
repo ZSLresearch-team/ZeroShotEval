@@ -2,19 +2,14 @@
 """
 
 # region IMPORTS
-import copy
 import torch
-import torch.backends.cudnn as cudnn
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torch.autograd as autograd
-from torch.utils import data
-from src.zeroshot_networks.cada_vae.vae_networks import EncoderTemplate, DecoderTemplate
+
+from .vae_networks import EncoderTemplate, DecoderTemplate
 # endregion
 
 
-class VaeModel(nn.Module):
+class VAEModel(nn.Module):
     """
     Model performs CADA-VAE ZSL approach
 
@@ -32,17 +27,21 @@ class VaeModel(nn.Module):
             {'img': 1024,
             'cls_attr': 312}
         """
-        super(VaeModel, self).__init__()
+        super(VAEModel, self).__init__()
         self.modalities = modalities
+        self.hidden_size_encoder = hidden_size_encoder
+        self.hidden_size_decoder = hidden_size_decoder
+        self.latent_size = latent_size
 
-        self.encoder = {}
-        for datatype, dim in zip(self.modalities, feature_dimensions):
-            self.encoder[datatype] = EncoderTemplate(dim, self.hidden_size_encoder[datatype], self.latent_size)
-            # print(str(datatype) + ' ' + str(dim))
+        self.encoder = nn.ModuleDict()
+        for modality, dim in zip(self.modalities, feature_dimensions):
+            self.encoder.update({modality: EncoderTemplate(dim, self.hidden_size_encoder[modality], self.latent_size)})
 
-        self.decoder = {}
-        for datatype, dim in zip(self.modalities, feature_dimensions):
-            self.decoder[datatype] = DecoderTemplate(self.latent_size, self.hidden_size_decoder[datatype], dim)
+        self.decoder = nn.ModuleDict()
+        for modality, dim in zip(self.modalities, feature_dimensions):
+            self.decoder.update({modality: DecoderTemplate(self.latent_size, self.hidden_size_decoder[modality], dim)})
+
+        # print(len(self.named_parameters()))
 
     def forward(self, x):
         """

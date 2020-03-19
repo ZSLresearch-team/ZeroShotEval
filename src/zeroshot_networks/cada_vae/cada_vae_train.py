@@ -20,24 +20,27 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
     Returns:
         loss_history(list): loss history for 
     """
-    model.to(device)
+    model.to(config.device)
 
     tqdm_epoch = trange(config.nepoch, desc='Loss: None. Epoch:', unit='epoch', disable=not(verbose>0), leave=True)
     tqdm_train_loader = tqdm(train_loader, desc='Batch:', unit='batch', disable=not(verbose>1), leave=False)
 
-    loss_history =[]
+    loss_history = []
     for epoch in tqdm_epoch:
-        
+
         model.train()
 
         loss_accum = 0
-        beta, cross_reconstruction_factor, distance_factor = loss_factors(epoch, config.warmup)
+        beta, cross_reconstruction_factor, distance_factor = loss_factors(epoch, config.specific_parameters.warmup)
 
         for i_step, (x, _) in enumerate(tqdm_train_loader):
+            
+            for modality, modality_tensor in x.items():
+                x[modality] = modality_tensor.to(config.device).float()
             x_recon, z_mu, z_var = model(x)
 
             loss_vae, loss_ca, loss_da = compute_cada_losses(x, x_recon, z_mu, z_var, beta, **kwargs)
-            
+
             loss_value = loss_vae
 
             if use_ca_loss and (loss_ca > 0):
@@ -50,9 +53,9 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
             optimizer.step()
 
             loss_accum += loss_value.item()
-        
-        loss_accum_mean /= (i_step + 1)
-        tqdm_epoch.set_description('Loss: {loss_accum_mean}. Epoch:')
+
+        loss_accum_mean = loss_accum / (i_step + 1)
+        tqdm_epoch.set_description(f'Loss: {loss_accum}. Epoch:')
         tqdm_epoch.refresh()
 
         loss_history.append(loss_accum_mean)
@@ -86,15 +89,15 @@ def compute_cada_losses(x, x_recon, z_mu, z_var, beta, **kwargs):
         # Calculate reconstruction and kld loss for each modality
         loss_recon += reconstruction_loss(x[modality], x_recon[modality], **kwargs)
         loss_kld += (1 + z_var[modality] - z_mu[modality].pow(2) - z_var[modality].exp()).mean()
-    
+
     loss_vae = loss_recon - beta * loss_kld
 
     for (modality_1, modality_2) in itertools.combinations(z_mu.keys(), 2):
         # Calulate cross allignment and distribution allignment loss for each pair of modalities
-        loss_da += compute_da_loss(z_mu[modality_1], z_mu[modality_2], z_var[modality_1], z_var[modality_2]
-        
-        loss_ca += reconstruction_loss(x[modality_1], x_recon[modality_2], **kwargs) \
-                    + reconstruction_loss(x[modality_2], x_recon[modality_1], **kwargs)
+        loss_da += compute_da_loss(z_mu[modality_1], z_mu[modality_2], z_var[modality_1], z_var[modality_2])
+        # !Nb wrong implementation! reconstruction_loss(x[modality_1], model.encoder[modality_1](mu[modality_2] +(std*eps)[modality_2])
+        # loss_ca += reconstruction_loss(x[modality_1], x_recon[modality_2], **kwargs) + \
+        #            reconstruction_loss(x[modality_2], x_recon[modality_1], **kwargs)
 
     n_modalities = len(z_mu)
     # loss_kld /= n_modalities
@@ -124,6 +127,9 @@ def compute_da_loss(z_mu_1, z_var_1, z_mu_2, z_var_2):
 
     return loss_da
 
+def compute_ca_loss(z_mu_1, z_var_1, z_mu_2, z_var_2):
+
+
 def reconstruction_loss(x, x_recon, recon_loss_norm="l2", **kwargs):
     r"""
     Computes reconstruction loss.
@@ -138,10 +144,10 @@ def reconstruction_loss(x, x_recon, recon_loss_norm="l2", **kwargs):
         loss_recon: reconstruction loss.
     """
     if recon_loss_norm == "l1":
-            loss_recon = nn.functional.l1_loss(x[modality], x_recon[modality])
-        elif recon_loss_norm == "l2":
-            loss_recon = nn.functional.mse_loss(x[modality], x_recon[modality])
-    
+        loss_recon = nn.functional.l1_loss(x, x_recon)
+    elif recon_loss_norm == "l2":
+        loss_recon = nn.functional.mse_loss(x, x_recon)
+
     return loss_recon
 
 def loss_factors(current_epoch, warmup):
@@ -160,9 +166,9 @@ def loss_factors(current_epoch, warmup):
     elif current_epoch >= warmup.cross_reconstruction.end_epoch:
         cross_reconstruction_factor = warmup.cross_reconstruction.factor
     else:
-        cross_reconstruction_factor = 1.0 * (current_epoch - warmup.cross_reconstruction.start_epoch) / \
-                                      (1.0 *(warmup.cross_reconstruction.end_epoch - warmup.cross_reconstruction.start_epoch)) \ 
-                                      *  warmup.cross_reconstruction.factor
+        cross_reconstruction_factor = 1.0 * (current_epoch - warmup.cross_reconstruction.start_epoch) / (
+            warmup.cross_reconstruction.end_epoch - warmup.cross_reconstruction.start_epoch) * \
+                warmup.cross_reconstruction.factor
 
     if current_epoch < warmup.beta.start_epoch:
         beta = 0
@@ -170,16 +176,14 @@ def loss_factors(current_epoch, warmup):
         beta = warmup.beta.factor
     else:
         beta = 1.0 * (current_epoch - warmup.beta.start_epoch) / \
-              (1.0 *(warmup.beta.end_epoch - warmup.beta.start_epoch)) \ 
-               *  warmup.beta.factor
+            (warmup.beta.end_epoch - warmup.beta.start_epoch) * warmup.beta.factor
 
-    if current_epoch < warmup.distance_factor.start_epoch:
+    if current_epoch < warmup.distance.start_epoch:
         distance_factor = 0
-    elif current_epoch >= warmup.distance_factor.end_epoch:
-        distance_factor = warmup.distance_factor.factor
+    elif current_epoch >= warmup.distance.end_epoch:
+        distance_factor = warmup.distance.factor
     else:
-        distance_factor = 1.0 * (current_epoch - warmup.distance_factor.start_epoch) / \
-              (1.0 *(warmup.distance_factor.end_epoch - warmup.distance_factor.start_epoch)) \ 
-               *  warmup.distance_factor.factor
+        distance_factor = 1.0 * (current_epoch - warmup.distance.start_epoch) / \
+              (warmup.distance.end_epoch - warmup.distance.start_epoch) * warmup.distance.factor
 
     return beta, cross_reconstruction_factor, distance_factor

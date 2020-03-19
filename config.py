@@ -49,7 +49,7 @@ default.compute_zsl_train_embeddings = True
 model = edict()
 
 model.general_parameters = edict()  # general hyper for all models
-model.general_parameters.device = 'cpu'
+model.general_parameters.device = 'cuda:0'
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
 model.general_parameters.batch_size = 32
@@ -66,7 +66,7 @@ model.cada_vae.distance = 'wasserstein'
 
 model.cada_vae.specific_parameters = edict()
 model.cada_vae.specific_parameters.lr_gen_model = 0.00015
-model.cada_vae.specific_parameters.loss = 'l1'
+model.cada_vae.specific_parameters.loss = 'l2'
 model.cada_vae.specific_parameters.latent_size = 64
 
 # NOTE: probably for classification task only
@@ -90,14 +90,14 @@ model.cada_vae.specific_parameters.hidden_layers.sentences = (1450, 665)
 model.cada_vae.specific_parameters.input_features_from_cnn = 2048  # for ResNet101
 
 model.cada_vae.specific_parameters.hidden_size_encoder = edict()
-model.cada_vae.specific_parameters.hidden_size_encoder.img = (1560)
-model.cada_vae.specific_parameters.hidden_size_encoder.cls_attr = (1450)
-model.cada_vae.specific_parameters.hidden_size_encoder.sentences = (1450)
+model.cada_vae.specific_parameters.hidden_size_encoder.img = [1560]
+model.cada_vae.specific_parameters.hidden_size_encoder.cls_attr = [1450]
+model.cada_vae.specific_parameters.hidden_size_encoder.sentences = [1450]
 
 model.cada_vae.specific_parameters.hidden_size_decoder = edict()
-model.cada_vae.specific_parameters.hidden_size_decoder.img = (1660)
-model.cada_vae.specific_parameters.hidden_size_decoder.cls_attr = (665)
-model.cada_vae.specific_parameters.hidden_size_decoder.sentences = (665)
+model.cada_vae.specific_parameters.hidden_size_decoder.img = [1660]
+model.cada_vae.specific_parameters.hidden_size_decoder.cls_attr = [665]
+model.cada_vae.specific_parameters.hidden_size_decoder.sentences = [665]
 
 model.cada_vae.specific_parameters.warmup = edict()
 model.cada_vae.specific_parameters.warmup.beta = edict()

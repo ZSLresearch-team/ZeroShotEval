@@ -1,5 +1,4 @@
-"""Main script-launcher for training of ZSL models.
-"""
+"""Main script-launcher for training of ZSL models."""
 
 
 # region IMPORTS
@@ -12,12 +11,18 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+import torch
+from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import DataLoader
+
 from config import default
 from config import generate_config
 
 from src.dataset_loaders.data_loader import load_dataset
 from src.modalities_feature_extractors.modalities_feature_extractor import compute_embeddings
-from src.zeroshot_networks.cada_vae.cada_vae_model import Model as CadaVaeModel
+from src.zeroshot_networks.cada_vae.cada_vae_model import VAEModel 
+from src.zeroshot_networks.cada_vae.cada_vae_train import train_VAE 
+from src.dataloader.dataset import ObjEmbeddingDataset
 
 # TODO: from gan_net import gan_model
 # endregion
@@ -25,8 +30,7 @@ from src.zeroshot_networks.cada_vae.cada_vae_model import Model as CadaVaeModel
 
 # region ARGUMENTS PROCESSING
 def init_arguments():
-    """Initialize arguments replacing the default ones.
-    """
+    """Initialize arguments replacing the default ones."""
     parser = argparse.ArgumentParser(
         description='Main script-launcher for training of ZSL models')
 
@@ -59,14 +63,12 @@ def init_arguments():
 
 
 def check_arguments(args):
-    """Check arguments compatibility and correctness.
-    """
+    """Check arguments compatibility and correctness."""
     pass
 
 
 def load_arguments():
-    """Initialize, check and pass arguments.
-    """
+    """Initialize, check and pass arguments."""
     parser = init_arguments()
     args = parser.parse_args()
     args = split_commasep_arguments(args)
@@ -109,7 +111,7 @@ def save_embeddings(embeddings, labels, splits, save_dir):
         print('Saving embeddings to "{}"'.format(embs_path))
         with open(embs_path, 'wb') as f:
             pickle.dump(embeddings[dataset_name], f)
-        
+
         print('Saving labels to "{}"'.format(lab_path))
         with open(lab_path, 'wb') as f:
             pickle.dump(labels[dataset_name], f)
@@ -134,7 +136,7 @@ def load_embeddings(load_dir):
             with open(path, 'rb') as f:
                 embeddings = pickle.load(f)
             embeddings_dict[dataset_name] = embeddings
-        
+
         elif filename.endswith('_obj_labels.pickle'):
             dataset_name = filename.rsplit('_', 2)[0]
             with open(path, 'rb') as f:
@@ -174,6 +176,21 @@ def split_dataset(modalities_dict, splits_df):
         test_seen_data = None
     return train_data, test_unseen_data, test_seen_data
 
+def get_indice_split(splits_df):
+    """
+    Get indices for data split using pandas dataframe with split info.
+
+    Args:
+        splits(pandas DataFrame): dataframe with object Id, and ``is_train`` is_seen`` binary columns.
+
+    Returns:
+        train_indice, test_seen_indice, test_unseen_indice: train, test seen and inseen indicies.
+    """
+    train_indice = splits_df[splits_df['is_train'] == 1]['obj_id'].to_numpy()
+    test_seen_indice = splits_df[(splits_df['is_train'] == 0) & (splits_df['is_seen'] == 1)]['obj_id'].to_numpy()
+    test_unseen_indice = splits_df[splits_df['is_seen'] == 0]['obj_id'].to_numpy()
+
+    return train_indice, test_seen_indice, test_unseen_indice
 
 def check_loaded_modalities(data_dict, modalities):
     for dataset_name, data in data_dict.items():
@@ -214,13 +231,13 @@ def get_data_dimensions(modalities_dict):
     dims = {}
     for modality_name, data in modalities_dict.items():
         if isinstance(data, np.ndarray):
-            dims[modality_name] = data.shape
+            dims[modality_name] = data.shape[1]
         elif isinstance(data, list):
             dims[modality_name] = len(data)
         else:
             raise NotImplementedError(
                 'Please write a way to get dimension for {}'.format(type(data)))
-        pass
+
     return dims
 # endregion
 
@@ -242,7 +259,7 @@ def main():
                                                               modalities=args.modalities,
                                                               path=config.path)
             datasets[dataset_name] = modalities_dict
-            datasets_labels[dataset_name] = labels 
+            datasets_labels[dataset_name] = labels
             datasets_splits[dataset_name] = splits_df
         # endregion
 
@@ -276,24 +293,41 @@ def main():
     for dataset_name, dataset_embeddings in embeddings.items():
         # TODO: add loop for regenerating splits and retraining ZSL net
         splits_df = datasets_splits[dataset_name]
+        labels = datasets_labels[dataset_name]
         if splits_df is None:
             # TODO: !!! Do not forget to handle GZSL parameter and make additional data split
             splits_df = generate_splits()
 
         train_embeddings, test_unseen_embeddings, test_seen_embeddings = split_dataset(
-            modalities_dict=dataset_embeddings, splits_df=splits_df)
+             modalities_dict=dataset_embeddings, splits_df=splits_df)
+        train_indice, test_seen_indice, test_unseen_indice = get_indice_split(splits_df)
 
         modalities_dimensions = get_data_dimensions(train_embeddings)
-
+        test_modality = 'img'
         # NOTE: now all loaded modalities are passed to the model, but
         # it shouldn't be a restriction! There can be a situation, where we want to
         # compare two different models, that are trained on different modalities
         if args.model == 'cada_vae':
-            model = CadaVaeModel(config=model_config,
-                                 modalities=args.modalities,
-                                 feature_dimensions=modalities_dimensions)
+            feature_dimensions = [modalities_dimensions[key] for key in args.modalities]
+            data = ObjEmbeddingDataset(dataset_embeddings, labels)
+
+            model = VAEModel(hidden_size_encoder=model_config.specific_parameters.hidden_size_encoder,
+                             hidden_size_decoder=model_config.specific_parameters.hidden_size_decoder,
+                             latent_size=model_config.specific_parameters.latent_size,
+                             modalities=args.modalities,
+                             feature_dimensions=feature_dimensions)
+
             model.to(model_config.device)
-            model.fit(train_embeddings)
+
+            optimizer = torch.optim.Adam(model.parameters(), lr=model_config.specific_parameters.lr_gen_model,
+                                         betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=True)
+
+            train_sampler = SubsetRandomSampler(train_indice)
+            train_loader = DataLoader(data, batch_size=model_config.batch_size, sampler=train_sampler)
+            train_VAE(config=model_config,
+                      model=model,
+                      train_loader=train_loader,
+                      optimizer=optimizer)
 
         elif args.model == 'clswgan':
             pass  # TODO: initialize the model with configs
@@ -301,16 +335,25 @@ def main():
         else:
             raise NotImplementedError('Unknown network')
 
-        zsl_unseen_embeddings = model.transform(test_unseen_embeddings)
-        zsl_seen_embeddings = model.transform(test_seen_embeddings)
+        # zsl_unseen_embeddings = model.transform(test_unseen_embeddings)
+        # zsl_seen_embeddings = model.transform(test_seen_embeddings)
 
-        if args.compute_zsl_train_embeddings:
-            zsl_train_embeddings = model.transform(train_embeddings)
+        # if args.compute_zsl_train_embeddings:
+        #     zsl_train_embeddings = model.transform(train_embeddings)
     # endregion
 
     # region ZSL EMBEDDINGS CACHING
-    if config.cache_zsl_embeddings:
-        pass  # TODO: cache computed embeddings on the disk
+    # if default.cache_zsl_embeddings:
+    #     train_embeddings_out = model.transform(train_embeddings).detach()
+    #     test_unseen_out = model.transform(test_unseen_embeddings).detach()
+    #     test_seen_out = model.transform(test_seen_embeddings).detach()
+    #     target_dir = default.obj_embeddings_save_path
+    #     file_train = os.path.join(target_dir, 'train.npy')
+    #     ile_unseen = os.path.join(target_dir, 'test_unseen.npy')
+    #     file_seen = os.path.join(target_dir, 'test_seen.npy')
+    #     np.save(file_train, train_embeddings_out.cpu().numpy())
+    #     np.save(file_unseen, test_unseen_out.cpu().numpy())
+    #     np.save(file_seen, test_unseen_out.cpu().numpy())
     # endregion
 
 

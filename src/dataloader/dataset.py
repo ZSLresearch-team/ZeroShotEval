@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset
 
 class ObjEmbeddingDataset(Dataset):
-    """Object emd dataset"""
+    """Object embeddings dataset"""
 
     def __init__(self, data, labels):
         """
@@ -11,7 +11,7 @@ class ObjEmbeddingDataset(Dataset):
             labels: list of ground truth labels for objects.
         """
         self.data = data
-        data = labels
+        self.labels = labels
 
     def __len__(self):
         return len(self.labels)
