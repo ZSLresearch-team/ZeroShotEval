@@ -324,10 +324,10 @@ def main():
 
             train_sampler = SubsetRandomSampler(train_indice)
             train_loader = DataLoader(data, batch_size=model_config.batch_size, sampler=train_sampler)
-            train_VAE(config=model_config,
-                      model=model,
-                      train_loader=train_loader,
-                      optimizer=optimizer)
+            loss_history = train_VAE(config=model_config,
+                                     model=model,
+                                     train_loader=train_loader,
+                                     optimizer=optimizer)
 
         elif args.model == 'clswgan':
             pass  # TODO: initialize the model with configs

@@ -52,8 +52,8 @@ model.general_parameters = edict()  # general hyper for all models
 model.general_parameters.device = 'cuda:0'
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
-model.general_parameters.batch_size = 32
-model.general_parameters.nepoch = 100
+model.general_parameters.batch_size = 512
+model.general_parameters.nepoch = 1000
 model.general_parameters.fp16_train_mode = False  # for GPUs with tensor cores
 
 
@@ -65,7 +65,7 @@ model.cada_vae.cross_resonstuction = True
 model.cada_vae.distance = 'wasserstein'
 
 model.cada_vae.specific_parameters = edict()
-model.cada_vae.specific_parameters.lr_gen_model = 0.00015
+model.cada_vae.specific_parameters.lr_gen_model = 0.001
 model.cada_vae.specific_parameters.loss = 'l2'
 model.cada_vae.specific_parameters.latent_size = 64
 

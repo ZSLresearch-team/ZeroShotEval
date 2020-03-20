@@ -49,16 +49,19 @@ class VAEModel(nn.Module):
             z_mu: dictionary mapping modalities names to mean layer out.
             z_var: dictionary mapping modalities names to variance layer out.
             x_recon: dictionary mapping modalities names to decoder out.
+            z_noize: dictionary mapping modalities names to decoder input.
         """
         z_mu = {}
         z_var = {}
         x_recon = {}
+        z_noize = {}
 
         for modality in self.modalities:
             z_mu[modality], z_var[modality] = self.encoder[modality](x[modality])
 
             std = (z_var[modality] / 2.0).exp()
             eps = torch.randn_like(std)
-            x_recon[modality] = self.decoder[modality](eps * std + z_mu[modality])
+            z_noize[modality] = eps * std + z_mu[modality]
+            x_recon[modality] = self.decoder[modality](z_noize[modality])
 
-        return x_recon, z_mu, z_var
+        return x_recon, z_mu, z_var, z_noize
