@@ -22,8 +22,8 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
     """
     model.to(config.device)
 
-    tqdm_epoch = trange(config.nepoch, desc='Loss: None. Epoch:', unit='epoch', disable=(verbose<=0), leave=True)
-    tqdm_train_loader = tqdm(train_loader, desc='Batch:', unit='batch', disable=(verbose<=1), leave=False)
+    tqdm_epoch = trange(config.nepoch, desc='Loss: None. Epoch', unit='epoch', disable=(verbose<=0), leave=True)
+    # tqdm_train_loader = tqdm(train_loader, desc='Batch:', unit='batch', disable=(verbose<=1), leave=False)
 
     loss_history = []
     for epoch in tqdm_epoch:
@@ -32,6 +32,7 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
 
         loss_accum = 0
         beta, cross_reconstruction_factor, distance_factor = loss_factors(epoch, config.specific_parameters.warmup)
+        tqdm_train_loader = tqdm(train_loader, desc='Loss: None. Batch', unit='batch', disable=(verbose<=1), leave=False)
 
         for i_step, (x, _) in enumerate(tqdm_train_loader):
 
@@ -54,14 +55,39 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
             optimizer.step()
 
             loss_accum += loss_value.item()
+            tqdm_train_loader.set_description(f'Loss: {loss_accum / (i_step + 1):.1f}. Batch')
+            tqdm_train_loader.refresh()
 
         loss_accum_mean = loss_accum / (i_step + 1)
-        tqdm_epoch.set_description(f'Loss: {loss_accum_mean}. Epoch:')
+        tqdm_epoch.set_description(f'Loss: {loss_accum_mean:.1f}. Epoch')
         tqdm_epoch.refresh()
 
         loss_history.append(loss_accum_mean)
 
     return loss_history
+
+def test_VAE(model, test_loader, test_modality):
+    """
+    Calculate zsl embeddings for given VAE model and data.
+
+    Args:
+        model: VAE model.
+        test_loader: test dataloader.
+        test_modality: modality name for modality to test.
+
+    Returns:
+        zsl_emb: zero shot learning embeddings for given data and model
+    """
+    model.eval()
+
+    with torch.no_grad():
+        zsl_emb = torch.Tensor().to('cpu')
+        labels = torch.Tensor().long().to('cpu')
+        for _i_step, (x, _y) in enumerate(test_loader):
+            _z_mu, _z_var, z_noize = model.encoder[test_modality](x[test_modality].float().to('cuda:0'))
+            zsl_emb = torch.cat((zsl_emb, z_noize.to('cpu')), 0)
+            labels = torch.cat((labels, _y.long()), 0)
+    return zsl_emb.to('cpu'), labels
 
 def compute_cada_losses(decoder, x, x_recon, z_mu, z_var, z_noize, beta, *args, **kwargs):
     r"""

@@ -57,11 +57,8 @@ class VAEModel(nn.Module):
         z_noize = {}
 
         for modality in self.modalities:
-            z_mu[modality], z_var[modality] = self.encoder[modality](x[modality])
+            z_mu[modality], z_var[modality], z_noize[modality] = self.encoder[modality](x[modality])
 
-            std = (z_var[modality] / 2.0).exp()
-            eps = torch.randn_like(std)
-            z_noize[modality] = eps * std + z_mu[modality]
             x_recon[modality] = self.decoder[modality](z_noize[modality])
 
         return x_recon, z_mu, z_var, z_noize

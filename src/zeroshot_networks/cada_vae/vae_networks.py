@@ -7,11 +7,17 @@ import torch.nn as nn
 
 
 def weights_init(m):
-    """Weight init."""
+    """
+    Weight init.
+
+    To do:
+        -Try another gain(1.41 )
+        -Try another weight initialization methods.
+    """
     classname = m.__class__.__name__
     if classname.find('Linear') != -1:
         m.bias.data.fill_(0)
-        nn.init.xavier_uniform_(m.weight, gain=0.5)
+        nn.init.xavier_uniform_(m.weight, gain=1.41)
 
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
@@ -54,8 +60,12 @@ class EncoderTemplate(nn.Module):
         hidden = self.feature_encoder(x)
         z_mu = self._mu(hidden)
         z_var = self._var(hidden)
+        
+        std = (z_var / 2.0).exp()
+        eps = torch.randn_like(std)
+        z_noize = eps * std + z_mu
 
-        return z_mu, z_var
+        return z_mu, z_var, z_noize
 
 
 class DecoderTemplate(nn.Module):

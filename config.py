@@ -37,10 +37,10 @@ default.cls_attr_net = 'word2vec'
 default.generalized_zsl = True
 
 # path to stored object embeddings to load
-default.saved_obj_embeddings_path = 'data/CUB'
-default.obj_embeddings_save_path = 'data'  # path to save computed embeddings
+default.saved_obj_embeddings_path = 'data/CUB/'
+default.obj_embeddings_save_path = 'data/CUB/zsl_emb/'  # path to save computed embeddings
 
-default.cache_zsl_embeddings = True
+default.cache_zsl_embeddings = False
 default.compute_zsl_train_embeddings = True
 # endregion
 
@@ -52,8 +52,8 @@ model.general_parameters = edict()  # general hyper for all models
 model.general_parameters.device = 'cuda:0'
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
-model.general_parameters.batch_size = 512
-model.general_parameters.nepoch = 1000
+model.general_parameters.batch_size = 32
+model.general_parameters.nepoch = 100
 model.general_parameters.fp16_train_mode = False  # for GPUs with tensor cores
 
 

@@ -12,8 +12,8 @@ import pandas as pd
 from pathlib import Path
 
 import torch
-from torch.utils.data.sampler import SubsetRandomSampler
-from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler, SequentialSampler
+from torch.utils.data import DataLoader, TensorDataset
 
 from config import default
 from config import generate_config
@@ -21,8 +21,9 @@ from config import generate_config
 from src.dataset_loaders.data_loader import load_dataset
 from src.modalities_feature_extractors.modalities_feature_extractor import compute_embeddings
 from src.zeroshot_networks.cada_vae.cada_vae_model import VAEModel 
-from src.zeroshot_networks.cada_vae.cada_vae_train import train_VAE 
+from src.zeroshot_networks.cada_vae.cada_vae_train import train_VAE, test_VAE
 from src.dataloader.dataset import ObjEmbeddingDataset
+from src.evaluation_procedures.classification import classification_procedure
 
 # TODO: from gan_net import gan_model
 # endregion
@@ -318,7 +319,7 @@ def main():
                              feature_dimensions=feature_dimensions)
 
             model.to(model_config.device)
-
+            # Model training
             optimizer = torch.optim.Adam(model.parameters(), lr=model_config.specific_parameters.lr_gen_model,
                                          betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=True)
 
@@ -327,7 +328,35 @@ def main():
             loss_history = train_VAE(config=model_config,
                                      model=model,
                                      train_loader=train_loader,
-                                     optimizer=optimizer)
+                                     optimizer=optimizer,
+                                     verbose=2)
+            # Model evaluating
+            sampler = SequentialSampler(data)
+            loader = DataLoader(data, batch_size=model_config.batch_size, sampler=sampler)
+
+            zsl_emb, _labels = test_VAE(model, loader, 'img')
+            # Save zsl embeddings if needed
+            if default.cache_zsl_embeddings:
+                target_dir = default.obj_embeddings_save_path
+                zsl_emb_file = os.path.join(target_dir, 'zsl_emb_cada_vae.pt')
+                torch.save(zsl_emb, zsl_emb_file)
+
+            # Train classifier
+            labels_tensor = torch.Tensor(labels).long().to(model_config.device)
+            # labels_tensor = labels
+            zsl_emb_dataset = TensorDataset(zsl_emb, labels_tensor)
+
+            train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist = \
+                classification_procedure(data=zsl_emb_dataset,
+                                        in_features=model_config.specific_parameters.latent_size ,
+                                        num_classes=datasets_config[dataset_name].num_classes,
+                                        batch_size=model_config.batch_size,
+                                        device=model_config.device,
+                                        n_epoch=model_config.specific_parameters.cls_train_epochs,
+                                        lr=model_config.specific_parameters.lr_cls,
+                                        train_indicies=train_indice,
+                                        test_seen_indicies=test_seen_indice,
+                                        test_unseen_indicies=test_seen_indice)
 
         elif args.model == 'clswgan':
             pass  # TODO: initialize the model with configs
