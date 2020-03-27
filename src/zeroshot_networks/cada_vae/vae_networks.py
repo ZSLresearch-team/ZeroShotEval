@@ -17,7 +17,7 @@ def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Linear') != -1:
         m.bias.data.fill_(0)
-        nn.init.xavier_uniform_(m.weight, gain=1.41)
+        nn.init.xavier_uniform_(m.weight, gain=0.7)
 
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
@@ -34,34 +34,34 @@ class EncoderTemplate(nn.Module):
         output_dim: size of output layer
     """
 
-    def __init__(self, input_dim, hidden_size_rule, output_dim):
+    def __init__(self, input_dim, hidden_size_rule, output_dim, use_bn=True, use_dropout=False):
         super(EncoderTemplate, self).__init__()
 
         self.layer_sizes = [input_dim] + hidden_size_rule + [output_dim]
 
         modules = []
         for i in range(len(self.layer_sizes)-2):
-
-            modules.append(
-                nn.Linear(self.layer_sizes[i], self.layer_sizes[i+1]))
+            if use_dropout and i > 0:
+                modules.append(nn.Dropout(p=0.3))
+            modules.append(nn.Linear(self.layer_sizes[i], self.layer_sizes[i+1]))
+            if use_bn:
+                modules.append(nn.BatchNorm1d(self.layer_sizes[i+1]))
             modules.append(nn.ReLU())
 
         self.feature_encoder = nn.Sequential(*modules)
 
-        self._mu = nn.Linear(
-            in_features=self.layer_sizes[-2], out_features=output_dim)
-
-        self._var = nn.Linear(
-            in_features=self.layer_sizes[-2], out_features=output_dim)
+        self.mu = nn.Linear(self.layer_sizes[-2], self.layer_sizes[-1])
+        self.var = nn.Linear(self.layer_sizes[-2], self.layer_sizes[-1])
 
         self.apply(weights_init)
 
     def forward(self, x):
         hidden = self.feature_encoder(x)
-        z_mu = self._mu(hidden)
-        z_var = self._var(hidden)
-        
-        std = (z_var / 2.0).exp()
+
+        z_mu = self.mu(hidden)
+        z_var = self.var(hidden)
+
+        std = z_var.exp()
         eps = torch.randn_like(std)
         z_noize = eps * std + z_mu
 
@@ -82,9 +82,6 @@ class DecoderTemplate(nn.Module):
 
         self.layer_sizes = [input_dim] + hidden_size_rule + [output_dim]
 
-        # self.feature_decoder = nn.Sequential(
-        #                                      nn.Linear(input_dim, self.layer_sizes[1]),
-        #                                      nn.ReLU(), nn.Linear(self.layer_sizes[1], output_dim))
         modules = []
         for i in range(len(self.layer_sizes)-2):
             modules.append(

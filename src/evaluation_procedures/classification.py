@@ -15,6 +15,7 @@ class SoftmaxClassifier(nn.Module):
     def __init__(self, cls_in, num_classes):
         super(SoftmaxClassifier, self).__init__()
         self.fc = nn.Linear(cls_in, num_classes)
+
         self.apply(weights_init)
 
     def forward(self, x):
@@ -32,7 +33,7 @@ def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Linear') != -1:
         m.bias.data.fill_(0)
-        nn.init.xavier_uniform_(m.weight, gain=1)
+        nn.init.xavier_uniform_(m.weight, gain=0.5)
 
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
@@ -109,6 +110,7 @@ def train_cls(classifier, optimizer, device, n_epoch, num_seen, num_unseen,
 
                 predictions = classifier(x)
                 correct_unseen += (predictions.argmax(dim=1) == y).sum().item()
+                # print(correct_unseen)
 
         # Calculate accuracies
         acc_seen = correct_seen / num_seen
@@ -127,9 +129,6 @@ def train_cls(classifier, optimizer, device, n_epoch, num_seen, num_unseen,
         tqdm_epoch.refresh()
 
     return loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist
-
-def compute_val_metrics(model, loader):
-    pass
 
 def compute_accuracy(model, loader):
     """
@@ -156,7 +155,7 @@ def classification_procedure(data, in_features, num_classes, batch_size, device,
 
     num_seen = len(test_seen_indicies)
     num_unseen = len(test_unseen_indicies)
-
+    print(num_seen, num_unseen)
     train_sampler = SubsetRandomSampler(train_indicies)
     test_seen_sampler = SubsetRandomSampler(test_seen_indicies)
     test_unseen_sampler = SubsetRandomSampler(test_unseen_indicies)

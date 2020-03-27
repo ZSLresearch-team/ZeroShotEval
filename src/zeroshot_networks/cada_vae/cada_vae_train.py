@@ -38,9 +38,9 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
 
             for modality, modality_tensor in x.items():
                 x[modality] = modality_tensor.to(config.device).float()
-            x_recon, z_mu, z_var, z_noize = model(x)
+            x_recon, z_mu, z_logvar, z_noize = model(x)
 
-            loss_vae, loss_ca, loss_da = compute_cada_losses(model.decoder, x, x_recon, z_mu, z_var, z_noize,
+            loss_vae, loss_ca, loss_da = compute_cada_losses(model.decoder, x, x_recon, z_mu, z_logvar, z_noize,
                                                              beta, *args, **kwargs)
 
             loss_value = loss_vae
@@ -84,12 +84,12 @@ def test_VAE(model, test_loader, test_modality):
         zsl_emb = torch.Tensor().to('cpu')
         labels = torch.Tensor().long().to('cpu')
         for _i_step, (x, _y) in enumerate(test_loader):
-            _z_mu, _z_var, z_noize = model.encoder[test_modality](x[test_modality].float().to('cuda:0'))
+            _z_mu, _z_logvar, z_noize = model.encoder[test_modality](x[test_modality].float().to('cuda:0'))
             zsl_emb = torch.cat((zsl_emb, z_noize.to('cpu')), 0)
             labels = torch.cat((labels, _y.long()), 0)
     return zsl_emb.to('cpu'), labels
 
-def compute_cada_losses(decoder, x, x_recon, z_mu, z_var, z_noize, beta, *args, **kwargs):
+def compute_cada_losses(decoder, x, x_recon, z_mu, z_logvar, z_noize, beta, *args, **kwargs):
     r"""
     Computes reconstruction loss, Kullback–Leibler divergence loss, and distridution allignment loss.
 
@@ -97,7 +97,7 @@ def compute_cada_losses(decoder, x, x_recon, z_mu, z_var, z_noize, beta, *args, 
         x(dict: {string: Tensor}): dictionary mapping modalities names to modalities input.
         x_recon(dict: {string: Tensor}): dictionary mapping modalities names to modalities input reconstruction.
         z_mu(dict: {string: Tensor}): dictionary mapping modalities names to mean.
-        z_var(dict: {string: Tensor}): dictionary mapping modalities names to variance.
+        z_logvar(dict: {string: Tensor}): dictionary mapping modalities names to variance logarithm.
         z_noize(dict: {string: Tensor}): dictionary mapping modalities names to encoder out.
         beta(float): KL loss factor in VAE loss
         recon_loss(string, optional): specifies the norm to apply to calculate reconstuction loss:
@@ -116,13 +116,13 @@ def compute_cada_losses(decoder, x, x_recon, z_mu, z_var, z_noize, beta, *args, 
     for modality in z_mu.keys():
         # Calculate reconstruction and kld loss for each modality
         loss_recon += reconstruction_loss(x[modality], x_recon[modality], **kwargs)
-        loss_kld = (z_mu[modality].pow(2) + z_var[modality].exp() - 1 - z_var[modality]).sum(dim=1).mean()
+        loss_kld = (z_mu[modality].pow(2) + z_logvar[modality].exp().sqrt() - 1 - z_logvar[modality]/2).sum(dim=1).mean()
 
     loss_vae = loss_recon + beta * loss_kld
 
     for (modality_1, modality_2) in itertools.combinations(z_mu.keys(), 2):
         # Calulate cross allignment and distribution allignment loss for each pair of modalities
-        loss_da += compute_da_loss(z_mu[modality_1], z_mu[modality_2], z_var[modality_1], z_var[modality_2])
+        loss_da += compute_da_loss(z_mu[modality_1], z_mu[modality_2], z_logvar[modality_1], z_logvar[modality_2])
         loss_ca += compute_ca_loss(decoder[modality_1], decoder[modality_2], x[modality_1], x[modality_2],
                                    z_noize[modality_1], z_noize[modality_2], *args, **kwargs)
 
@@ -132,22 +132,23 @@ def compute_cada_losses(decoder, x, x_recon, z_mu, z_var, z_noize, beta, *args, 
 
     return loss_vae, loss_ca, loss_da
 
-def compute_da_loss(z_mu_1, z_var_1, z_mu_2, z_var_2):
+def compute_da_loss(z_mu_1, z_logvar_1, z_mu_2, z_logvar_2):
     r"""
     Computes Distribution Allignment loss.
     Using Wasserstein distance.
 
     Args:
         z_mu_1(dict: {string: Tensor}): mean for first modality endoderer out
-        z_var_1(dict: {string: Tensor}): variance for first modality endoderer out
+        z_logvar_1(dict: {string: Tensor}): variance logarithm for first modality endoderer out
         z_mu_2(dict: {string: Tensor}): mean for second modality endoderer out
-        z_var_2(dict: {string: Tensor}): variance for second modality endoderer out
+        z_logvar_2(dict: {string: Tensor}): variance logarithm for second modality endoderer out
 
     Return:
         loss_da: Distribution Allignment loss
     """
+
     loss_mu = (z_mu_1 - z_mu_2).pow(2).sum(dim=1)
-    loss_var = ((z_var_1 / 2.0).exp() + (z_var_2 / 2.0).exp()).pow(2).sum(dim=1)
+    loss_var = (z_logvar_1.exp() - z_logvar_2.exp()).pow(2).sum(dim=1)
 
     loss_da = torch.sqrt(loss_mu + loss_var).mean()
 

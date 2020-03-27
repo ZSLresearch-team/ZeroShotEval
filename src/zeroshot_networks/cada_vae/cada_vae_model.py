@@ -41,24 +41,22 @@ class VAEModel(nn.Module):
         for modality, dim in zip(self.modalities, feature_dimensions):
             self.decoder.update({modality: DecoderTemplate(self.latent_size, self.hidden_size_decoder[modality], dim)})
 
-        # print(len(self.named_parameters()))
-
     def forward(self, x):
         """
         Returns:
             z_mu: dictionary mapping modalities names to mean layer out.
-            z_var: dictionary mapping modalities names to variance layer out.
+            z_logvar: dictionary mapping modalities names to variance layer out.
             x_recon: dictionary mapping modalities names to decoder out.
             z_noize: dictionary mapping modalities names to decoder input.
         """
         z_mu = {}
-        z_var = {}
+        z_logvar = {}
         x_recon = {}
         z_noize = {}
 
         for modality in self.modalities:
-            z_mu[modality], z_var[modality], z_noize[modality] = self.encoder[modality](x[modality])
+            z_mu[modality], z_logvar[modality], z_noize[modality] = self.encoder[modality](x[modality])
 
             x_recon[modality] = self.decoder[modality](z_noize[modality])
 
-        return x_recon, z_mu, z_var, z_noize
+        return x_recon, z_mu, z_logvar, z_noize

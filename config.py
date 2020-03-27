@@ -28,7 +28,7 @@ from easydict import EasyDict as edict
 default = edict()
 
 default.model = 'cada_vae'
-default.datasets = 'cub,awa2'
+default.datasets = 'cub'
 
 default.modalities = 'img,cls_attr'
 default.img_net = 'resnet101'
@@ -41,7 +41,7 @@ default.saved_obj_embeddings_path = 'data/CUB/'
 default.obj_embeddings_save_path = 'data/CUB/zsl_emb/'  # path to save computed embeddings
 
 default.cache_zsl_embeddings = False
-default.compute_zsl_train_embeddings = True
+default.compute_zsl_train_embeddiaaaangs = True
 # endregion
 
 
@@ -52,7 +52,7 @@ model.general_parameters = edict()  # general hyper for all models
 model.general_parameters.device = 'cuda:0'
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
-model.general_parameters.batch_size = 32
+model.general_parameters.batch_size = 256
 model.general_parameters.nepoch = 100
 model.general_parameters.fp16_train_mode = False  # for GPUs with tensor cores
 
@@ -70,7 +70,7 @@ model.cada_vae.specific_parameters.loss = 'l2'
 model.cada_vae.specific_parameters.latent_size = 64
 
 # NOTE: probably for classification task only
-model.cada_vae.specific_parameters.lr_cls = 0.001
+model.cada_vae.specific_parameters.lr_cls = 0.0001
 # early stopping nepoch стоит изменить
 model.cada_vae.specific_parameters.cls_train_epochs = 100
 # для общности следует переделать эту и связанные части
@@ -111,7 +111,7 @@ model.cada_vae.specific_parameters.warmup.cross_reconstruction.end_epoch = 75
 model.cada_vae.specific_parameters.warmup.cross_reconstruction.start_epoch = 21
 
 model.cada_vae.specific_parameters.warmup.distance = edict()
-model.cada_vae.specific_parameters.warmup.distance.factor = 8.13
+model.cada_vae.specific_parameters.warmup.distance.factor = 6.13
 model.cada_vae.specific_parameters.warmup.distance.end_epoch = 22
 model.cada_vae.specific_parameters.warmup.distance.start_epoch = 6
 
@@ -135,7 +135,7 @@ dataset = edict()
 # region CUB DATASET CONFIGS
 dataset.cub = edict()
 dataset.cub.dataset_name = 'cub'
-dataset.cub.path = 'data/CUB_200_2011/'
+dataset.cub.path = 'data/CUB/'
 dataset.cub.precomputed_embeddings_path = 'data/CUB/res101.mat'
 
 dataset.cub.num_classes = 200
@@ -165,6 +165,10 @@ dataset.cub.object_embedding.resnet101.path = ''
 # region AWA2 DATASET CONFIGS
 dataset.awa2 = edict()
 dataset.awa2.dataset_name = 'awa2'
+dataset.awa2.path = 'data/AWA2/'
+
+dataset.awa2.num_classes = 50
+dataset.awa2.num_novel_classes = 10
 # TODO: complete AWA2 DATASET CONFIGS section
 # endregion
 
