@@ -17,12 +17,18 @@ class VAEModel(nn.Module):
         https://arxiv.org/pdf/1812.01784.pdf
     """
 
-    def __init__(self, hidden_size_encoder, hidden_size_decoder, latent_size, modalities, feature_dimensions):
+    def __init__(self,
+                 hidden_size_encoder,
+                 hidden_size_decoder,
+                 latent_size,
+                 modalities,
+                 feature_dimensions,
+                 *args, **kvargs):
         """
         Args:
             latent_size: size of models latent space
             modalities: list of modalities to be used
-            feature_dimensions: dictionary mapping modalities names to modalities embedding size.
+            feature_dimensions: dictionary mapping modalities names to modalities embedding size. !Temp list
             For example:
             {'img': 1024,
             'cls_attr': 312}
@@ -35,7 +41,8 @@ class VAEModel(nn.Module):
 
         self.encoder = nn.ModuleDict()
         for modality, dim in zip(self.modalities, feature_dimensions):
-            self.encoder.update({modality: EncoderTemplate(dim, self.hidden_size_encoder[modality], self.latent_size)})
+            self.encoder.update({modality: EncoderTemplate(dim, self.hidden_size_encoder[modality],
+                                                           self.latent_size, *args, **kvargs)})
 
         self.decoder = nn.ModuleDict()
         for modality, dim in zip(self.modalities, feature_dimensions):

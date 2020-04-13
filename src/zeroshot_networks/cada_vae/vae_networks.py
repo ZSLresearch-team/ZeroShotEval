@@ -17,7 +17,7 @@ def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Linear') != -1:
         m.bias.data.fill_(0)
-        nn.init.xavier_uniform_(m.weight, gain=0.7)
+        nn.init.xavier_uniform_(m.weight, gain=0.5)
 
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
@@ -32,13 +32,15 @@ class EncoderTemplate(nn.Module):
         input_dim: size of input layer
         hidden size_rule: list of sizes of hidden layers
         output_dim: size of output layer
+        use_bn(bool): if ``True`` - use batchnorm layers.
+        use_dropout(bool): if ``True`` - use dropout layers.
     """
 
-    def __init__(self, input_dim, hidden_size_rule, output_dim, use_bn=True, use_dropout=False):
+    def __init__(self, input_dim, hidden_size_rule, output_dim, use_bn=True, use_dropout=False, repar_factor=.5):
         super(EncoderTemplate, self).__init__()
 
         self.layer_sizes = [input_dim] + hidden_size_rule + [output_dim]
-
+        self.repar_factor = repar_factor
         modules = []
         for i in range(len(self.layer_sizes)-2):
             if use_dropout and i > 0:
@@ -59,13 +61,13 @@ class EncoderTemplate(nn.Module):
         hidden = self.feature_encoder(x)
 
         z_mu = self.mu(hidden)
-        z_var = self.var(hidden)
+        z_logvar = self.var(hidden)
 
-        std = z_var.exp()
+        std = (self.repar_factor * z_logvar).exp()
         eps = torch.randn_like(std)
         z_noize = eps * std + z_mu
 
-        return z_mu, z_var, z_noize
+        return z_mu, z_logvar, z_noize
 
 
 class DecoderTemplate(nn.Module):

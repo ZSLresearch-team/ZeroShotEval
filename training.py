@@ -4,12 +4,12 @@
 # region IMPORTS
 import argparse
 import os
-import sys
 import copy
 import pickle
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler, SequentialSampler
@@ -18,12 +18,16 @@ from torch.utils.data import DataLoader, TensorDataset
 from config import default
 from config import generate_config
 
+from single_experiment import experiment
 from src.dataset_loaders.data_loader import load_dataset
 from src.modalities_feature_extractors.modalities_feature_extractor import compute_embeddings
 from src.zeroshot_networks.cada_vae.cada_vae_model import VAEModel 
-from src.zeroshot_networks.cada_vae.cada_vae_train import train_VAE, test_VAE
+from src.zeroshot_networks.cada_vae.cada_vae_train import train_VAE, test_VAE, VAE_train_procedure
 from src.dataloader.dataset import ObjEmbeddingDataset
 from src.evaluation_procedures.classification import classification_procedure
+
+from ray import tune
+from ray.tune.suggest.bayesopt import BayesOptSearch
 
 # TODO: from gan_net import gan_model
 # endregion
@@ -193,6 +197,21 @@ def get_indice_split(splits_df):
 
     return train_indice, test_seen_indice, test_unseen_indice
 
+def get_indice_for_zsl_emb(subset_indices, labels, classes, samples_per_class, use_train=True):
+    """
+    """
+    indices = np.array([], dtype=np.int64)
+    for label in classes:
+        if use_train:
+            class_indices = np.intersect1d(np.sort(subset_indices), np.where(labels == label))
+        else:
+            class_indices = np.intersect1d(np.sort(subset_indices), np.where(labels == label))
+
+        class_indices = np.resize(class_indices, samples_per_class)
+        indices = np.append(indices, class_indices)
+
+    return indices
+
 def check_loaded_modalities(data_dict, modalities):
     for dataset_name, data in data_dict.items():
         keys = set(data.keys())
@@ -261,9 +280,7 @@ def main():
                                                               path=config.path)
             datasets[dataset_name] = modalities_dict
             datasets_labels[dataset_name] = labels
-            datasets_splits[dataset_name] = splits_df
-        # endregion
-
+            datasets_splits[dataset_name] = splits_dfdataset
         # region DATA OBJ EMBEDDINGS EXTRACTION
         embeddings = {}
         for dataset_name, data in datasets.items():
@@ -287,7 +304,7 @@ def main():
 
     # region MODALITIES PREPARATION
     embeddings = filter_modalities(embeddings, args.modalities)
-    embeddings = extend_cls_attributes(embeddings, datasets_labels)
+    # embeddings = extend_cls_attributes(embeddings, datasets_labels)
     # endregion
 
     # region ZERO-SHOT MODELS TRAINING / INFERENCE
@@ -295,68 +312,51 @@ def main():
         # TODO: add loop for regenerating splits and retraining ZSL net
         splits_df = datasets_splits[dataset_name]
         labels = datasets_labels[dataset_name]
+
         if splits_df is None:
             # TODO: !!! Do not forget to handle GZSL parameter and make additional data split
             splits_df = generate_splits()
 
-        train_embeddings, test_unseen_embeddings, test_seen_embeddings = split_dataset(
-             modalities_dict=dataset_embeddings, splits_df=splits_df)
-        train_indice, test_seen_indice, test_unseen_indice = get_indice_split(splits_df)
+        # train_embeddings, test_unseen_embeddings, test_seen_embeddings = split_dataset(
+        #      modalities_dict=dataset_embeddings, splits_df=splits_df)
 
-        modalities_dimensions = get_data_dimensions(train_embeddings)
+
+        # modalities_dimensions = get_data_dimensions(train_embeddings)
         test_modality = 'img'
         # NOTE: now all loaded modalities are passed to the model, but
         # it shouldn't be a restriction! There can be a situation, where we want to
         # compare two different models, that are trained on different modalities
         if args.model == 'cada_vae':
-            feature_dimensions = [modalities_dimensions[key] for key in args.modalities]
-            data = ObjEmbeddingDataset(dataset_embeddings, labels)
 
-            model = VAEModel(hidden_size_encoder=model_config.specific_parameters.hidden_size_encoder,
-                             hidden_size_decoder=model_config.specific_parameters.hidden_size_decoder,
-                             latent_size=model_config.specific_parameters.latent_size,
-                             modalities=args.modalities,
-                             feature_dimensions=feature_dimensions)
+            config = dict(model_config)
+            data = ObjEmbeddingDataset(dataset_embeddings, labels, splits_df, ['img'])
+            
 
-            model.to(model_config.device)
-            # Model training
-            optimizer = torch.optim.Adam(model.parameters(), lr=model_config.specific_parameters.lr_gen_model,
-                                         betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=True)
+            space = {
+                # 'nepoch': (50, 120),
+                # 'cls_train_epochs': (40, 80),
+                # 'lr_gen_model': (1e-4, 1e-2),
+                'lr_cls': (1e-4, 1e-2),
+                # 'beta_factor': (0.1, .5),
+                # 'beta_end_epoch': (80, 100),
+                # 'beta_start_epoch': (0, 5),
+                # 'cross_reconstruction_factor': (1.5, 5),
+                # 'cross_reconstruction_end_epoch': (60, 92),
+                # 'cross_reconstruction_start_epoch': (20, 30),
+                # 'distance_factor': (3, 15),
+                # 'distance_end_epoch': (15, 30),
+                # 'distance_start_epoch': (0, 10),
+                # 'seen_unseen_factor': (1.5, 4.5)
+            }
 
-            train_sampler = SubsetRandomSampler(train_indice)
-            train_loader = DataLoader(data, batch_size=model_config.batch_size, sampler=train_sampler)
-            loss_history = train_VAE(config=model_config,
-                                     model=model,
-                                     train_loader=train_loader,
-                                     optimizer=optimizer,
-                                     verbose=2)
-            # Model evaluating
-            sampler = SequentialSampler(data)
-            loader = DataLoader(data, batch_size=model_config.batch_size, sampler=sampler)
 
-            zsl_emb, _labels = test_VAE(model, loader, 'img')
-            # Save zsl embeddings if needed
-            if default.cache_zsl_embeddings:
-                target_dir = default.obj_embeddings_save_path
-                zsl_emb_file = os.path.join(target_dir, 'zsl_emb_cada_vae.pt')
-                torch.save(zsl_emb, zsl_emb_file)
+            utility_kwargs={"kind": "ucb", "kappa": 2.5, "xi": 0.0}
+            algo = BayesOptSearch(space, max_concurrent=1, metric='acc_H', mode="max", utility_kwargs=utility_kwargs)
+            tune.run(experiment, search_alg=algo, config=config, resources_per_trial={'cpu': 6, 'gpu': 1}, num_samples=1500)
+            # experiment(model_config)
 
-            # Train classifier
-            labels_tensor = torch.Tensor(labels).long().to(model_config.device)
-            # labels_tensor = labels
-            zsl_emb_dataset = TensorDataset(zsl_emb, labels_tensor)
-
-            train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist = \
-                classification_procedure(data=zsl_emb_dataset,
-                                        in_features=model_config.specific_parameters.latent_size ,
-                                        num_classes=datasets_config[dataset_name].num_classes,
-                                        batch_size=model_config.batch_size,
-                                        device=model_config.device,
-                                        n_epoch=model_config.specific_parameters.cls_train_epochs,
-                                        lr=model_config.specific_parameters.lr_cls,
-                                        train_indicies=train_indice,
-                                        test_seen_indicies=test_seen_indice,
-                                        test_unseen_indicies=test_seen_indice)
+            
+            
 
         elif args.model == 'clswgan':
             pass  # TODO: initialize the model with configs

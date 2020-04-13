@@ -1,8 +1,13 @@
 import itertools
+from tqdm import tqdm, trange
+import numpy as np
+
 import torch
 import torch.nn as nn
-from tqdm import tqdm, trange
+from torch.utils.data.sampler import SubsetRandomSampler, SequentialSampler
+from torch.utils.data import DataLoader, TensorDataset
 
+from .cada_vae_model import VAEModel 
 
 def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_loss=True, verbose=1, *args, **kwargs):
     r"""
@@ -87,6 +92,7 @@ def test_VAE(model, test_loader, test_modality):
             _z_mu, _z_logvar, z_noize = model.encoder[test_modality](x[test_modality].float().to('cuda:0'))
             zsl_emb = torch.cat((zsl_emb, z_noize.to('cpu')), 0)
             labels = torch.cat((labels, _y.long()), 0)
+
     return zsl_emb.to('cpu'), labels
 
 def compute_cada_losses(decoder, x, x_recon, z_mu, z_logvar, z_noize, beta, *args, **kwargs):
@@ -116,7 +122,7 @@ def compute_cada_losses(decoder, x, x_recon, z_mu, z_logvar, z_noize, beta, *arg
     for modality in z_mu.keys():
         # Calculate reconstruction and kld loss for each modality
         loss_recon += reconstruction_loss(x[modality], x_recon[modality], **kwargs)
-        loss_kld = (z_mu[modality].pow(2) + z_logvar[modality].exp().sqrt() - 1 - z_logvar[modality]/2).sum(dim=1).mean()
+        loss_kld += (z_mu[modality].pow(2) + z_logvar[modality].exp() - 1 - z_logvar[modality]).sum(dim=1).mean()
 
     loss_vae = loss_recon + beta * loss_kld
 
@@ -148,7 +154,7 @@ def compute_da_loss(z_mu_1, z_logvar_1, z_mu_2, z_logvar_2):
     """
 
     loss_mu = (z_mu_1 - z_mu_2).pow(2).sum(dim=1)
-    loss_var = (z_logvar_1.exp() - z_logvar_2.exp()).pow(2).sum(dim=1)
+    loss_var = ((0.5 * z_logvar_1).exp() - (0.5 * z_logvar_2).exp()).pow(2).sum(dim=1)
 
     loss_da = torch.sqrt(loss_mu + loss_var).mean()
 
@@ -239,3 +245,89 @@ def loss_factors(current_epoch, warmup):
               (warmup.distance.end_epoch - warmup.distance.start_epoch) * warmup.distance.factor
 
     return beta, cross_reconstruction_factor, distance_factor
+
+def VAE_train_procedure(model_config, dataset, gen_sen_data=True, save_model=False, save_dir='../../../model/'):
+    """
+    Launches Cada-vae model training and generates zsl_embedding dataset for classifier training.
+
+    Args:
+        model_config(dict): dictionary with setting dor model.
+        dataset: dataset for training and evaluating.
+        gen_sen_data(bool): if ``True`` generates senthetic data for classifier after training.
+        save_model(bool):  if ``True``saves model. 
+        save_dir(str): root to models save dir.
+
+    Returns:
+        model: trrained model.
+     
+    """
+    feature_dimensions = [2048, 312]
+    model = VAEModel(hidden_size_encoder=model_config.specific_parameters.hidden_size_encoder,
+                     hidden_size_decoder=model_config.specific_parameters.hidden_size_decoder,
+                     latent_size=model_config.specific_parameters.latent_size,
+                     modalities=dataset.modalities,
+                     feature_dimensions=feature_dimensions,
+                     use_bn=model_config.specific_parameters.use_bn,
+                     use_dropout=model_config.specific_parameters.use_dropout,
+                     repar_factor=model_config.specific_parameters.repar_factor
+                     )
+
+    model.to(model_config.device)
+            # Model training
+    optimizer = torch.optim.Adam(model.parameters(), lr=model_config.specific_parameters.lr_gen_model,
+                                 betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=True)
+
+    train_sampler = SubsetRandomSampler(dataset.train_indices)
+    train_loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=train_sampler)
+
+    loss_history = train_VAE(config=model_config,
+                             model=model,
+                             train_loader=train_loader,
+                             optimizer=optimizer,
+                             recon_loss_norm=model_config.specific_parameters.loss,
+                             verbose=model_config.verbose)
+    if save_model:
+        # TODO: implement model saving
+        pass
+
+    if gen_sen_data:
+        zsl_emb_object_indice, zsl_emb_class_indice = \
+            dataset.get_zsl_emb_indice(model_config.specific_parameters.samples_per_modality_class)
+
+        # Generate zsl embeddings for train seen images
+        sampler = SubsetRandomSampler(zsl_emb_object_indice)
+        loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=sampler)
+
+        zsl_emb_img, zsl_emb_labels_img = test_VAE(model, loader, 'img')
+
+        # Generate zsl embeddings for unseen classes
+        sampler = SubsetRandomSampler(zsl_emb_class_indice)
+        loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=sampler)
+
+        zsl_emb_cls_attr, labels_cls_attr = test_VAE(model, loader, 'cls_attr')
+
+        # Generate zsl embeddings for test data
+        sampler = SubsetRandomSampler(dataset.test_indices)
+        loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=sampler)
+
+        zsl_emb_test, zsl_emb_labels_test = test_VAE(model, loader, 'img')
+
+        # Create zsl embeddings dataset
+        zsl_emb = torch.cat((zsl_emb_img, zsl_emb_cls_attr, zsl_emb_test), 0)
+
+        zsl_emb_labels_img = zsl_emb_labels_img.long().to(model_config.device)
+        labels_cls_attr = labels_cls_attr.long().to(model_config.device)
+        zsl_emb_labels_test = zsl_emb_labels_test.long().to(model_config.device)
+
+        labels_tensor = torch.cat((zsl_emb_labels_img, labels_cls_attr, zsl_emb_labels_test), 0)
+
+        # Getting train and test indices
+        n_train = len(zsl_emb_labels_img) + len(labels_cls_attr)
+        csl_train_indice = np.arange(n_train)
+        csl_test_indice = np.arange(n_train, n_train + len(zsl_emb_labels_test))
+
+        zsl_emb_dataset = TensorDataset(zsl_emb, labels_tensor)
+
+        return zsl_emb_dataset, csl_train_indice, csl_test_indice
+
+    return model

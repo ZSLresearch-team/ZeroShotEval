@@ -5,6 +5,8 @@ import torch.nn as nn
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data import DataLoader
 
+import numpy as np
+from sklearn.metrics import confusion_matrix
 from tqdm import trange
 
 class SoftmaxClassifier(nn.Module):
@@ -40,8 +42,8 @@ def weights_init(m):
         m.bias.data.fill_(0)
 
 
-def train_cls(classifier, optimizer, device, n_epoch, num_seen, num_unseen,
-              train_loader, test_seen_loader, test_unseen_loader):
+def train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes,
+              unseen_classes, train_loader, test_loader, verbose=1):
     """
     Train Softmax classifier model
 
@@ -55,6 +57,7 @@ def train_cls(classifier, optimizer, device, n_epoch, num_seen, num_unseen,
         train_loader: loaer of the train data.
         test_seen_loader: loader of the test seen data.
         test_unseen_loader: loader of the test unseen data.
+        verbose: boolean or Int. The higher value verbose is - the more info you get.
 
     Returns:
         loss_hist(list): train loss history.
@@ -69,15 +72,16 @@ def train_cls(classifier, optimizer, device, n_epoch, num_seen, num_unseen,
     acc_unseen_hist = []
     acc_H_hist = []
 
-    print("Train Classifier")
-    tqdm_epoch = trange(n_epoch, desc='Accuracy Seen: None. Unseen: None. H:', unit='epoch', disable=False, leave=True)
+    if verbose >= 1:
+        print("Train Classifier")
+    
+    tqdm_epoch = trange(n_epoch, desc='Accuracy Seen: None. Unseen: None. H', unit='epoch', disable=(verbose<=0), leave=True)
 
     for epoch in tqdm_epoch:
         classifier.train()
 
         loss_accum = 0
-        correct_seen = 0
-        correct_unseen = 0 
+
 
         for i_step, (x, y) in enumerate(train_loader):
             x = x.to(device)
@@ -94,33 +98,10 @@ def train_cls(classifier, optimizer, device, n_epoch, num_seen, num_unseen,
 
         loss_hist.append(loss_accum / i_step)
 
-        classifier.eval()
-        # Test seen classes
-        with torch.no_grad():
-            for _, (x, y) in enumerate(test_seen_loader):
-                x = x.to(device)
-                y = y.to(device)
-
-                predictions = classifier(x)
-                correct_seen += (predictions.argmax(dim=1) == y).sum().item()
-            # Test unseen classes
-            for _, (x, y) in enumerate(test_unseen_loader):
-                x = x.to(device)
-                y = y.to(device)
-
-                predictions = classifier(x)
-                correct_unseen += (predictions.argmax(dim=1) == y).sum().item()
-                # print(correct_unseen)
-
         # Calculate accuracies
-        acc_seen = correct_seen / num_seen
-        acc_unseen = correct_unseen / num_unseen
+        acc_seen, acc_unseen, acc_H = compute_mean_per_class_accuracies(classifier, test_loader, seen_classes,
+                                                                        unseen_classes, device)
         # To be reworked
-        if (acc_unseen < 1e-4) or (acc_seen < 1e-4):
-            acc_H = 0
-        else:
-            acc_H = (2 * acc_seen * acc_unseen) / (acc_seen + acc_unseen)
-
         acc_seen_hist.append(acc_seen)
         acc_unseen_hist.append(acc_unseen)
         acc_H_hist.append(acc_H)
@@ -130,45 +111,86 @@ def train_cls(classifier, optimizer, device, n_epoch, num_seen, num_unseen,
 
     return loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist
 
-def compute_accuracy(model, loader):
+def compute_mean_per_class_accuracies(classifier, loader, seen_classes, unseen_classes, device):
     """
-    Computes accuracy on the dataset wrapped in a loader
+    Computes mean per-class accuracies for both seen and unseen classes.
 
-    Returns: accuracy as a float value between 0 and 1
+    Args:
+        classifier: classifaer model to eval.
+        loader(Dataloader): data loader.
+        seen_classes(numpy array): labels of seen classes.
+        unseen_classes(numpy array): labels of unseen classes.
+        device(String): device to use.
+
+    Returns:
+        acc_seen: mean per-class accuracy for seen classes.
+        acc_unseen: mean per-class accuracy for unseen classes.
+        acc_H: harmonic mean between mean per-class accuracies for seen classes anduanseen classes.
     """
-    model.eval()
 
-    correct_samples = 0
-    total_samples = 0
-    for i_step, (x, y) in enumerate(loader):
-        prediction = model(x)
-        _, indices = torch.max(prediction, 1)
-        correct_samples += torch.sum(indices == y)
-        total_samples += y.shape[0]
+    classifier.eval()
+    labels_all = torch.Tensor().long().to(device)
+    preds_all = torch.Tensor().long().to(device)
+    with torch.no_grad():
+        for _, (x, y) in enumerate(loader):
+            x = x.to(device)
+            y = y.to(device)
 
-    return float(correct_samples) / total_samples
+            probs = classifier(x)
+            _, preds = torch.max(probs, 1)
 
-def classification_procedure(data, in_features, num_classes, batch_size, device, n_epoch,
-                             lr, train_indicies, test_seen_indicies, test_unseen_indicies):
+            labels_all = torch.cat((labels_all, y), 0)
+            preds_all = torch.cat((preds_all, preds.long()), 0)
 
+    conf_matrix = confusion_matrix(labels_all.cpu().numpy(), preds_all.cpu().numpy())
+    acc_seen = (np.diag(conf_matrix)[seen_classes] / conf_matrix.sum(1)[seen_classes]).mean()
+    acc_unseen = (np.diag(conf_matrix)[unseen_classes] / conf_matrix.sum(1)[unseen_classes]).mean()
+
+    if (acc_unseen < 1e-4) or (acc_seen < 1e-4):
+        acc_H = 0
+    else:
+        acc_H = (2 * acc_seen * acc_unseen) / (acc_seen + acc_unseen)
+
+    return acc_seen, acc_unseen, acc_H
+
+def classification_procedure(data, in_features, num_classes, batch_size, device, n_epoch, lr,
+                             train_indicies, test_indicies, seen_classes, unseen_classes, verbose):
+    """
+    Launches classifier training.
+
+    Args:
+        data:
+        in_features:
+        num_classes:
+        batch_size(Int): batch size for classifier training.
+        device(str): model device.
+        n_epoch(int): number of epochs to train.
+        lr(float): learning rate.
+        train_indicies: indicies of training data.
+        test_indices: inicies of testing data.
+        seen_classes(numpy array): labels of seen classes.
+        unseen_classes(numpy array): labels of unseen classes.
+        verbose: boolean or Int. The higher value verbose is - the more info you get.
+    
+    Returns:
+        loss_hist(list): train loss history.
+        acc_seen_hist(list): accuracy for seen classes.
+        acc_unseen_hist(list): accuracy for unseen classes.
+        acc_H_hist(list): harmonic mean of seen and unseen accuracies.
+    """
     classifier = SoftmaxClassifier(in_features, num_classes)
 
-    num_seen = len(test_seen_indicies)
-    num_unseen = len(test_unseen_indicies)
-    print(num_seen, num_unseen)
     train_sampler = SubsetRandomSampler(train_indicies)
-    test_seen_sampler = SubsetRandomSampler(test_seen_indicies)
-    test_unseen_sampler = SubsetRandomSampler(test_unseen_indicies)
+    test_sampler = SubsetRandomSampler(test_indicies)
 
     train_loader = DataLoader(data, batch_size=batch_size, sampler=train_sampler)
-    test_seen_loader = DataLoader(data, batch_size=batch_size, sampler=test_seen_sampler)
-    test_unseen_loader = DataLoader(data, batch_size=batch_size, sampler=test_unseen_sampler)
+    test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sampler)
 
-    optimizer = torch.optim.Adam(classifier.parameters(), lr=lr, betas=(0.5, 0.999))
+    optimizer = torch.optim.Adam(classifier.parameters(), lr=lr)
 
     train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist = \
-        train_cls(classifier, optimizer, device, n_epoch, num_seen, num_unseen,
-                  train_loader, test_seen_loader, test_unseen_loader)
+        train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes, 
+                  unseen_classes, train_loader, test_loader, verbose=verbose)
 
     print(f'Best accuracy H: {max(acc_H_hist)}')
 
