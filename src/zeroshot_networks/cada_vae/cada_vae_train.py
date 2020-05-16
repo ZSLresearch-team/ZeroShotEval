@@ -36,6 +36,7 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
         model.train()
 
         loss_accum = 0
+        distance_accum = 0
         beta, cross_reconstruction_factor, distance_factor = loss_factors(epoch, config.specific_parameters.warmup)
         tqdm_train_loader = tqdm(train_loader, desc='Loss: None. Batch', unit='batch', disable=(verbose<=1), leave=False)
 
@@ -43,27 +44,30 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
 
             for modality, modality_tensor in x.items():
                 x[modality] = modality_tensor.to(config.device).float()
+                x[modality].requires_grad = False
             x_recon, z_mu, z_logvar, z_noize = model(x)
 
             loss_vae, loss_ca, loss_da = compute_cada_losses(model.decoder, x, x_recon, z_mu, z_logvar, z_noize,
                                                              beta, *args, **kwargs)
 
-            loss_value = loss_vae
+            loss = loss_vae
 
             if use_ca_loss and (loss_ca > 0):
-                loss_value += loss_ca * cross_reconstruction_factor
+                loss += loss_ca * cross_reconstruction_factor
             if use_da_loss and (loss_da > 0):
-                loss_value += loss_da * distance_factor
+                loss += loss_da * distance_factor
 
             optimizer.zero_grad()
-            loss_value.backward()
+            loss.backward()
             optimizer.step()
 
-            loss_accum += loss_value.item()
+            loss_accum += loss.item()
+
             tqdm_train_loader.set_description(f'Loss: {loss_accum / (i_step + 1):.1f}. Batch')
             tqdm_train_loader.refresh()
 
         loss_accum_mean = loss_accum / (i_step + 1)
+
         tqdm_epoch.set_description(f'Loss: {loss_accum_mean:.1f}. Epoch')
         tqdm_epoch.refresh()
 
@@ -71,7 +75,7 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
 
     return loss_history
 
-def test_VAE(model, test_loader, test_modality):
+def eval_VAE(model, test_loader, test_modality, reparametrize_with_noise=True):
     """
     Calculate zsl embeddings for given VAE model and data.
 
@@ -89,8 +93,17 @@ def test_VAE(model, test_loader, test_modality):
         zsl_emb = torch.Tensor().to('cpu')
         labels = torch.Tensor().long().to('cpu')
         for _i_step, (x, _y) in enumerate(test_loader):
-            _z_mu, _z_logvar, z_noize = model.encoder[test_modality](x[test_modality].float().to('cuda:0'))
-            zsl_emb = torch.cat((zsl_emb, z_noize.to('cpu')), 0)
+            if test_modality == 'img':
+                x = x[test_modality].float().to('cuda:0')
+            else:
+                x = x.float().to('cuda:0')
+            z_mu, _z_logvar, z_noize = model.encoder[test_modality](x)
+
+            if reparametrize_with_noise:
+                zsl_emb = torch.cat((zsl_emb, z_noize.to('cpu')), 0)
+            else:
+                zsl_emb = torch.cat((zsl_emb, z_mu.to('cpu')), 0)
+
             labels = torch.cat((labels, _y.long()), 0)
 
     return zsl_emb.to('cpu'), labels
@@ -122,9 +135,10 @@ def compute_cada_losses(decoder, x, x_recon, z_mu, z_logvar, z_noize, beta, *arg
     for modality in z_mu.keys():
         # Calculate reconstruction and kld loss for each modality
         loss_recon += reconstruction_loss(x[modality], x_recon[modality], **kwargs)
-        loss_kld += (z_mu[modality].pow(2) + z_logvar[modality].exp() - 1 - z_logvar[modality]).sum(dim=1).mean()
 
-    loss_vae = loss_recon + beta * loss_kld
+        loss_kld += 0.5 * (1 + z_logvar[modality] - z_mu[modality].pow(2) - z_logvar[modality].exp()).sum(dim=1).mean()
+
+    loss_vae = loss_recon - beta * loss_kld
 
     for (modality_1, modality_2) in itertools.combinations(z_mu.keys(), 2):
         # Calulate cross allignment and distribution allignment loss for each pair of modalities
@@ -132,9 +146,6 @@ def compute_cada_losses(decoder, x, x_recon, z_mu, z_logvar, z_noize, beta, *arg
         loss_ca += compute_ca_loss(decoder[modality_1], decoder[modality_2], x[modality_1], x[modality_2],
                                    z_noize[modality_1], z_noize[modality_2], *args, **kwargs)
 
-    n_modalities = len(z_mu)
-    # loss_kld /= n_modalities
-    loss_da /= n_modalities * (n_modalities - 1) / 2
 
     return loss_vae, loss_ca, loss_da
 
@@ -144,17 +155,17 @@ def compute_da_loss(z_mu_1, z_logvar_1, z_mu_2, z_logvar_2):
     Using Wasserstein distance.
 
     Args:
-        z_mu_1(dict: {string: Tensor}): mean for first modality endoderer out
-        z_logvar_1(dict: {string: Tensor}): variance logarithm for first modality endoderer out
-        z_mu_2(dict: {string: Tensor}): mean for second modality endoderer out
-        z_logvar_2(dict: {string: Tensor}): variance logarithm for second modality endoderer out
+        z_mu_1(Tensor): mean for first modality endoderer out
+        z_logvar_1(Tensor): variance logarithm for first modality endoderer out
+        z_mu_2(Tensor): mean for second modality endoderer out
+        z_logvar_2(Tensor): variance logarithm for second modality endoderer out
 
     Return:
         loss_da: Distribution Allignment loss
     """
 
     loss_mu = (z_mu_1 - z_mu_2).pow(2).sum(dim=1)
-    loss_var = ((0.5 * z_logvar_1).exp() - (0.5 * z_logvar_2).exp()).pow(2).sum(dim=1)
+    loss_var = (torch.sqrt(z_logvar_1.exp()) - torch.sqrt(z_logvar_2.exp())).pow(2).sum(dim=1)
 
     loss_da = torch.sqrt(loss_mu + loss_var).mean()
 
@@ -219,6 +230,14 @@ def loss_factors(current_epoch, warmup):
     Returns:
         beta, cross_reconstruction_factor, distance_factor
     """
+    if current_epoch < warmup.beta.start_epoch:
+        beta = 0
+    elif current_epoch >= warmup.beta.end_epoch:
+        beta = warmup.beta.factor
+    else:
+        beta = 1.0 * (current_epoch - warmup.beta.start_epoch) / \
+            (warmup.beta.end_epoch - warmup.beta.start_epoch) * warmup.beta.factor
+
     if current_epoch < warmup.cross_reconstruction.start_epoch:
         cross_reconstruction_factor = 0
     elif current_epoch >= warmup.cross_reconstruction.end_epoch:
@@ -227,14 +246,6 @@ def loss_factors(current_epoch, warmup):
         cross_reconstruction_factor = 1.0 * (current_epoch - warmup.cross_reconstruction.start_epoch) / (
             warmup.cross_reconstruction.end_epoch - warmup.cross_reconstruction.start_epoch) * \
                 warmup.cross_reconstruction.factor
-
-    if current_epoch < warmup.beta.start_epoch:
-        beta = 0
-    elif current_epoch >= warmup.beta.end_epoch:
-        beta = warmup.beta.factor
-    else:
-        beta = 1.0 * (current_epoch - warmup.beta.start_epoch) / \
-            (warmup.beta.end_epoch - warmup.beta.start_epoch) * warmup.beta.factor
 
     if current_epoch < warmup.distance.start_epoch:
         distance_factor = 0
@@ -246,20 +257,108 @@ def loss_factors(current_epoch, warmup):
 
     return beta, cross_reconstruction_factor, distance_factor
 
-def VAE_train_procedure(model_config, dataset, gen_sen_data=True, save_model=False, save_dir='../../../model/'):
+def generate_synthetic_dataset(model_config, dataset, model):
+    """
+    Generates synthetic dataset via trained zsl model to cls training
+
+    Args:
+        model_config(dict): dictionary with setting for model.
+        datset: original dataset.
+        model: pretrained CADA-VAE model.
+
+    Returns:
+        zsl_emb_dataset: sythetic dataset for classifier .
+        csl_train_indice: train indicies.
+        csl_test_indice: test indicies.
+
+    """
+    zsl_emb_object_indice, zsl_emb_class, zsl_emb_class_label = \
+        dataset.get_zsl_emb_indice(model_config.specific_parameters.samples_per_modality_class)
+
+        # Set CADA-Vae model to evaluate mode
+    model.eval()
+
+    # Generate zsl embeddings for train seen images
+    if model_config.generalized:
+        sampler = SubsetRandomSampler(zsl_emb_object_indice)
+        loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=sampler)
+
+        zsl_emb_img, zsl_emb_labels_img = eval_VAE(model, loader, 'img')
+    else:
+        zsl_emb_img = torch.FloatTensor()
+        zsl_emb_labels_img = torch.LongTensor()
+
+    # Generate zsl embeddings for unseen classes
+    zsl_emb_class = torch.from_numpy(zsl_emb_class)
+    zsl_emb_class_label = torch.from_numpy(zsl_emb_class_label)    
+    zsl_emb_dataset = TensorDataset(zsl_emb_class, zsl_emb_class_label)
+
+    loader = DataLoader(zsl_emb_dataset, batch_size=model_config.batch_size)
+
+    zsl_emb_cls_attr, labels_cls_attr = eval_VAE(model, loader, 'cls_attr')
+    if not model_config.generalized: 
+        labels_cls_attr = remap_labels(labels_cls_attr.cpu().numpy(), dataset.unseen_classes)
+        labels_cls_attr = torch.from_numpy(labels_cls_attr)
+
+    # Generate zsl embeddings for test data
+    if model_config.generalized:
+        sampler = SubsetRandomSampler(dataset.test_indices)
+    else:
+        sampler = SubsetRandomSampler(dataset.test_unseen_indices)
+
+    loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=sampler)
+
+    zsl_emb_test, zsl_emb_labels_test = eval_VAE(model, loader, 'img', reparametrize_with_noise=False)
+
+    # Create zsl embeddings dataset
+    zsl_emb = torch.cat((zsl_emb_img, zsl_emb_cls_attr, zsl_emb_test), 0)
+
+    zsl_emb_labels_img = zsl_emb_labels_img.long().to(model_config.device)
+    labels_cls_attr = labels_cls_attr.long().to(model_config.device)
+    zsl_emb_labels_test = zsl_emb_labels_test.long().to(model_config.device)
+
+    labels_tensor = torch.cat((zsl_emb_labels_img, labels_cls_attr, zsl_emb_labels_test), 0)
+
+    # Getting train and test indices
+    n_train = len(zsl_emb_labels_img) + len(labels_cls_attr)
+    csl_train_indice = np.arange(n_train)
+    csl_test_indice = np.arange(n_train, n_train + len(zsl_emb_labels_test))
+
+    zsl_emb_dataset = TensorDataset(zsl_emb, labels_tensor)
+
+    return zsl_emb_dataset, csl_train_indice, csl_test_indice
+
+
+def remap_labels(labels, classes):
+    """
+    Remapping labels
+
+    Args:
+        labels(np.array): array of labels
+        classes:
+
+    Returns:
+        Remapped labels
+    """
+    remapping_dict = dict(zip(classes, list(range(len(classes)))))
+
+    return np.vectorize(remapping_dict.get)(labels)
+
+
+def VAE_train_procedure(model_config, dataset, gen_syn_data=True, save_model=False, save_dir='../../../model/'):
     """
     Launches Cada-vae model training and generates zsl_embedding dataset for classifier training.
 
     Args:
-        model_config(dict): dictionary with setting dor model.
+        model_config(dict): dictionary with setting for model.
         dataset: dataset for training and evaluating.
-        gen_sen_data(bool): if ``True`` generates senthetic data for classifier after training.
+        gen_sen_data(bool): if ``True`` generates synthetic data for classifier after training.
         save_model(bool):  if ``True``saves model. 
         save_dir(str): root to models save dir.
 
     Returns:
         model: trrained model.
-     
+
     """
     feature_dimensions = [2048, 312]
     model = VAEModel(hidden_size_encoder=model_config.specific_parameters.hidden_size_encoder,
@@ -268,66 +367,31 @@ def VAE_train_procedure(model_config, dataset, gen_sen_data=True, save_model=Fal
                      modalities=dataset.modalities,
                      feature_dimensions=feature_dimensions,
                      use_bn=model_config.specific_parameters.use_bn,
-                     use_dropout=model_config.specific_parameters.use_dropout,
-                     repar_factor=model_config.specific_parameters.repar_factor
+                     use_dropout=model_config.specific_parameters.use_dropout
                      )
 
     model.to(model_config.device)
-            # Model training
+    # Model training
     optimizer = torch.optim.Adam(model.parameters(), lr=model_config.specific_parameters.lr_gen_model,
                                  betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=True)
 
     train_sampler = SubsetRandomSampler(dataset.train_indices)
-    train_loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=train_sampler)
+    train_loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=train_sampler, drop_last=True)
 
     loss_history = train_VAE(config=model_config,
                              model=model,
                              train_loader=train_loader,
                              optimizer=optimizer,
                              recon_loss_norm=model_config.specific_parameters.loss,
+                             use_ca_loss=model_config.cross_resonstuction,
+                             use_da_loss=model_config.distibution_allignment,
                              verbose=model_config.verbose)
     if save_model:
         # TODO: implement model saving
         pass
 
-    if gen_sen_data:
-        zsl_emb_object_indice, zsl_emb_class_indice = \
-            dataset.get_zsl_emb_indice(model_config.specific_parameters.samples_per_modality_class)
+    if gen_syn_data:
 
-        # Generate zsl embeddings for train seen images
-        sampler = SubsetRandomSampler(zsl_emb_object_indice)
-        loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=sampler)
-
-        zsl_emb_img, zsl_emb_labels_img = test_VAE(model, loader, 'img')
-
-        # Generate zsl embeddings for unseen classes
-        sampler = SubsetRandomSampler(zsl_emb_class_indice)
-        loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=sampler)
-
-        zsl_emb_cls_attr, labels_cls_attr = test_VAE(model, loader, 'cls_attr')
-
-        # Generate zsl embeddings for test data
-        sampler = SubsetRandomSampler(dataset.test_indices)
-        loader = DataLoader(dataset, batch_size=model_config.batch_size, sampler=sampler)
-
-        zsl_emb_test, zsl_emb_labels_test = test_VAE(model, loader, 'img')
-
-        # Create zsl embeddings dataset
-        zsl_emb = torch.cat((zsl_emb_img, zsl_emb_cls_attr, zsl_emb_test), 0)
-
-        zsl_emb_labels_img = zsl_emb_labels_img.long().to(model_config.device)
-        labels_cls_attr = labels_cls_attr.long().to(model_config.device)
-        zsl_emb_labels_test = zsl_emb_labels_test.long().to(model_config.device)
-
-        labels_tensor = torch.cat((zsl_emb_labels_img, labels_cls_attr, zsl_emb_labels_test), 0)
-
-        # Getting train and test indices
-        n_train = len(zsl_emb_labels_img) + len(labels_cls_attr)
-        csl_train_indice = np.arange(n_train)
-        csl_test_indice = np.arange(n_train, n_train + len(zsl_emb_labels_test))
-
-        zsl_emb_dataset = TensorDataset(zsl_emb, labels_tensor)
-
-        return zsl_emb_dataset, csl_train_indice, csl_test_indice
+        return generate_synthetic_dataset(model_config, dataset, model)
 
     return model

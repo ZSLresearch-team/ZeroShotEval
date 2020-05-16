@@ -57,6 +57,7 @@ def read_matdataset(matdata_file, root_path):
     matdata = sio.loadmat(os.path.join(root_path, matdata_file))
 
     img_embeddings = matdata['features'].T
+    img_embeddings = preprocess_data(img_embeddings)
     labels = matdata['labels'].astype(int).squeeze() - 1
 
     img_embeddings = {'img': img_embeddings}
@@ -134,6 +135,7 @@ def load_dataset_embeddings(dataset_name, path,
             \n\tIn other case you will catch a lot of errors!')
 
     img_embeddings, labels = read_matdataset(matdata_file, root_path=path)
+
     aux_modalities_embeddings = read_matattributes(
         matattrsplit_file, root_path=path, dataset=dataset_name)
     splits_df = read_data_splits(matattrsplit_file, root_path=path)

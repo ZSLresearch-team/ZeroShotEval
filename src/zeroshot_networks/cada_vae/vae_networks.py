@@ -36,15 +36,15 @@ class EncoderTemplate(nn.Module):
         use_dropout(bool): if ``True`` - use dropout layers.
     """
 
-    def __init__(self, input_dim, hidden_size_rule, output_dim, use_bn=True, use_dropout=False, repar_factor=.5):
+    def __init__(self, input_dim, hidden_size_rule, output_dim, use_bn=True, use_dropout=False):
         super(EncoderTemplate, self).__init__()
 
         self.layer_sizes = [input_dim] + hidden_size_rule + [output_dim]
-        self.repar_factor = repar_factor
         modules = []
+
         for i in range(len(self.layer_sizes)-2):
             if use_dropout and i > 0:
-                modules.append(nn.Dropout(p=0.3))
+                modules.append(nn.Dropout(p=0.2))
             modules.append(nn.Linear(self.layer_sizes[i], self.layer_sizes[i+1]))
             if use_bn:
                 modules.append(nn.BatchNorm1d(self.layer_sizes[i+1]))
@@ -63,8 +63,10 @@ class EncoderTemplate(nn.Module):
         z_mu = self.mu(hidden)
         z_logvar = self.var(hidden)
 
-        std = (self.repar_factor * z_logvar).exp()
-        eps = torch.randn_like(std)
+        std = (z_logvar).exp()
+        eps = torch.randn(z_logvar.size()[0], 1).to(z_logvar.device)
+        eps = eps.expand(z_logvar.size())
+
         z_noize = eps * std + z_mu
 
         return z_mu, z_logvar, z_noize

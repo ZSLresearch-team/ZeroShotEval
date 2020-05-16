@@ -74,7 +74,7 @@ def train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes,
 
     if verbose >= 1:
         print("Train Classifier")
-    
+
     tqdm_epoch = trange(n_epoch, desc='Accuracy Seen: None. Unseen: None. H', unit='epoch', disable=(verbose<=0), leave=True)
 
     for epoch in tqdm_epoch:
@@ -186,7 +186,7 @@ def classification_procedure(data, in_features, num_classes, batch_size, device,
     train_loader = DataLoader(data, batch_size=batch_size, sampler=train_sampler)
     test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sampler)
 
-    optimizer = torch.optim.Adam(classifier.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(classifier.parameters(), lr=lr, betas=(0.9, 0.999))
 
     train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist = \
         train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes, 

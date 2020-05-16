@@ -22,7 +22,7 @@ from single_experiment import experiment
 from src.dataset_loaders.data_loader import load_dataset
 from src.modalities_feature_extractors.modalities_feature_extractor import compute_embeddings
 from src.zeroshot_networks.cada_vae.cada_vae_model import VAEModel 
-from src.zeroshot_networks.cada_vae.cada_vae_train import train_VAE, test_VAE, VAE_train_procedure
+from src.zeroshot_networks.cada_vae.cada_vae_train import train_VAE, eval_VAE, VAE_train_procedure
 from src.dataloader.dataset import ObjEmbeddingDataset
 from src.evaluation_procedures.classification import classification_procedure
 
@@ -310,12 +310,6 @@ def main():
     # region ZERO-SHOT MODELS TRAINING / INFERENCE
     for dataset_name, dataset_embeddings in embeddings.items():
         # TODO: add loop for regenerating splits and retraining ZSL net
-        splits_df = datasets_splits[dataset_name]
-        labels = datasets_labels[dataset_name]
-
-        if splits_df is None:
-            # TODO: !!! Do not forget to handle GZSL parameter and make additional data split
-            splits_df = generate_splits()
 
         # train_embeddings, test_unseen_embeddings, test_seen_embeddings = split_dataset(
         #      modalities_dict=dataset_embeddings, splits_df=splits_df)
@@ -328,32 +322,7 @@ def main():
         # compare two different models, that are trained on different modalities
         if args.model == 'cada_vae':
 
-            config = dict(model_config)
-            data = ObjEmbeddingDataset(dataset_embeddings, labels, splits_df, ['img'])
-            
-
-            space = {
-                # 'nepoch': (50, 120),
-                # 'cls_train_epochs': (40, 80),
-                # 'lr_gen_model': (1e-4, 1e-2),
-                'lr_cls': (1e-4, 1e-2),
-                # 'beta_factor': (0.1, .5),
-                # 'beta_end_epoch': (80, 100),
-                # 'beta_start_epoch': (0, 5),
-                # 'cross_reconstruction_factor': (1.5, 5),
-                # 'cross_reconstruction_end_epoch': (60, 92),
-                # 'cross_reconstruction_start_epoch': (20, 30),
-                # 'distance_factor': (3, 15),
-                # 'distance_end_epoch': (15, 30),
-                # 'distance_start_epoch': (0, 10),
-                # 'seen_unseen_factor': (1.5, 4.5)
-            }
-
-
-            utility_kwargs={"kind": "ucb", "kappa": 2.5, "xi": 0.0}
-            algo = BayesOptSearch(space, max_concurrent=1, metric='acc_H', mode="max", utility_kwargs=utility_kwargs)
-            tune.run(experiment, search_alg=algo, config=config, resources_per_trial={'cpu': 6, 'gpu': 1}, num_samples=1500)
-            # experiment(model_config)
+            experiment(model_config)
 
             
             

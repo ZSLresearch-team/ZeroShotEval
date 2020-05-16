@@ -41,7 +41,7 @@ default.saved_obj_embeddings_path = 'data/CUB/'
 default.obj_embeddings_save_path = 'data/CUB/zsl_emb/'  # path to save computed embeddings
 
 default.cache_zsl_embeddings = False
-default.compute_zsl_train_embeddiaaaangs = True
+default.compute_zsl_train_embeddings = True
 # endregion
 
 
@@ -52,31 +52,36 @@ model.general_parameters = edict()  # general hyper for all models
 model.general_parameters.device = 'cuda:0'
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
-model.general_parameters.batch_size = 256
+model.general_parameters.batch_size = 50
 model.general_parameters.nepoch = 100
 model.general_parameters.fp16_train_mode = False  # for GPUs with tensor cores
-
+model.general_parameters.verbose = 2
 
 # region CADA_VAE CONFIGS
 model.cada_vae = edict()
 model.cada_vae.model_name = 'cada_vae'
-# model.CADA_VAE.class_name = "CADA_VAE"
-model.cada_vae.cross_resonstuction = True
 model.cada_vae.distance = 'wasserstein'
+model.cada_vae.cross_resonstuction = True
+model.cada_vae.distibution_allignment = True
 
 model.cada_vae.specific_parameters = edict()
-model.cada_vae.specific_parameters.lr_gen_model = 0.001
-model.cada_vae.specific_parameters.loss = 'l2'
+model.cada_vae.specific_parameters.lr_gen_model = 0.00015
+model.cada_vae.specific_parameters.loss = 'l1'
 model.cada_vae.specific_parameters.latent_size = 64
+model.cada_vae.specific_parameters.use_bn = False
+model.cada_vae.specific_parameters.use_dropout = False
 
 # NOTE: probably for classification task only
-model.cada_vae.specific_parameters.lr_cls = 0.0001
+model.cada_vae.specific_parameters.lr_cls = 0.001
 # early stopping nepoch стоит изменить
-model.cada_vae.specific_parameters.cls_train_epochs = 100
+model.cada_vae.specific_parameters.cls_train_epochs = 30
 # для общности следует переделать эту и связанные части
 model.cada_vae.specific_parameters.auxiliary_data_source = 'attributes'
 
 
+model.cada_vae.specific_parameters.samples_per_modality_class = edict()
+model.cada_vae.specific_parameters.samples_per_modality_class.img = 200
+model.cada_vae.specific_parameters.samples_per_modality_class.cls_attr = 400
 # NOTE: эти парамертры стоит извлекать из генераторов эмбедингов/кэшированных эмбедингов.
 # Их нужно перенести в dataset или куда-то ещё.
 #
@@ -111,7 +116,7 @@ model.cada_vae.specific_parameters.warmup.cross_reconstruction.end_epoch = 75
 model.cada_vae.specific_parameters.warmup.cross_reconstruction.start_epoch = 21
 
 model.cada_vae.specific_parameters.warmup.distance = edict()
-model.cada_vae.specific_parameters.warmup.distance.factor = 6.13
+model.cada_vae.specific_parameters.warmup.distance.factor = 8.13
 model.cada_vae.specific_parameters.warmup.distance.end_epoch = 22
 model.cada_vae.specific_parameters.warmup.distance.start_epoch = 6
 
@@ -135,7 +140,7 @@ dataset = edict()
 # region CUB DATASET CONFIGS
 dataset.cub = edict()
 dataset.cub.dataset_name = 'cub'
-dataset.cub.path = 'data/CUB/'
+dataset.cub.path = 'data/CUB/resnet101/'
 dataset.cub.precomputed_embeddings_path = 'data/CUB/res101.mat'
 
 dataset.cub.num_classes = 200
@@ -181,7 +186,10 @@ def generate_config(parsed_model, parsed_datasets):
         specific_model[key] = value
 
     datasets = {}
-    for dataset_name in ['cub']:
-        datasets[dataset_name] = dataset[dataset_name]
+    for dataset_name in parsed_datasets:
+        # datasets[dataset_name] = dataset[dataset_name]
+        # specific_model[dataset_name] = dataset[dataset_name]
+        pass
+    specific_model['cub'] = dataset.cub
 
     return specific_model, datasets
