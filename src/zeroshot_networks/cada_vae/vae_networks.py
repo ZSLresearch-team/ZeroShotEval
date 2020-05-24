@@ -36,14 +36,14 @@ class EncoderTemplate(nn.Module):
         use_dropout(bool): if ``True`` - use dropout layers.
     """
 
-    def __init__(self, input_dim, hidden_size_rule, output_dim, use_bn=True, use_dropout=False):
+    def __init__(self, input_dim, hidden_size_rule, output_dim, use_bn=False, use_dropout=False):
         super(EncoderTemplate, self).__init__()
 
         self.layer_sizes = [input_dim] + hidden_size_rule + [output_dim]
         modules = []
 
         for i in range(len(self.layer_sizes)-2):
-            if use_dropout and i > 0:
+            if use_dropout:
                 modules.append(nn.Dropout(p=0.2))
             modules.append(nn.Linear(self.layer_sizes[i], self.layer_sizes[i+1]))
             if use_bn:
@@ -58,6 +58,12 @@ class EncoderTemplate(nn.Module):
         self.apply(weights_init)
 
     def forward(self, x):
+        """
+        Returns:
+            z_mu: mean layer out.
+            z_logvar: variance layer out.
+            z_noize: latent space representation.
+        """
         hidden = self.feature_encoder(x)
 
         z_mu = self.mu(hidden)
@@ -98,4 +104,9 @@ class DecoderTemplate(nn.Module):
         self.apply(weights_init)
 
     def forward(self, x):
+        """
+        Returns:
+            Decoder out
+        """
+
         return self.feature_decoder(x)

@@ -105,32 +105,7 @@ def load_configurations(args):
 # endregion
 
 
-# region SAVING/LOADING COMPUTED DATA
-def save_embeddings(embeddings, labels, splits, save_dir):
-    print('\n[info] Saving all data to "{}"'.format(save_path))
-    for dataset_name in embeddings:
-        embs_path = save_dir / (dataset_name + '_obj_embeddings.pickle')
-        lab_path = save_dir / (dataset_name + '_obj_labels.pickle')
-        splits_path = save_dir / (dataset_name + '_splits.csv')
-
-        print('Saving embeddings to "{}"'.format(embs_path))
-        with open(embs_path, 'wb') as f:
-            pickle.dump(embeddings[dataset_name], f)
-
-        print('Saving labels to "{}"'.format(lab_path))
-        with open(lab_path, 'wb') as f:
-            pickle.dump(labels[dataset_name], f)
-
-        if splits[dataset_name]:  # if splits are defined for the dataset
-            print('Save data splits to "{}"'.format(splits_path))
-            splits[dataset_name].to_csv(splits_path, index=False)
-
-    print('Done!')
-
-
 def load_embeddings(load_dir):
-    print('[INFO] Loading computed embeddings and data splits from "{}"...'.format(
-        load_dir), end=' ')
     embeddings_dict = {}
     dataset_labels = {}
     dataset_splits = {}
@@ -155,7 +130,7 @@ def load_embeddings(load_dir):
 
     if not dataset_splits:  # if there are no predefined splits for this dataset
         dataset_splits = None
-    print('Done!')
+
     return embeddings_dict, dataset_labels, dataset_splits
 # endregion
 
@@ -266,7 +241,6 @@ def main():
     args = load_arguments()
     model_config, datasets_config = load_configurations(args)
 
-    print('\n========== DATA LOADING ==========\n')
     if not args.saved_obj_embeddings_path:
 
         # region DATA LOADING
@@ -289,12 +263,6 @@ def main():
         # endregion
 
         # region OBJ EMBEDDINGS SAVING
-        if args.obj_embeddings_save_path:
-            save_embeddings(embeddings=embeddings,
-                            labels=datasets_labels,
-                            splits=datasets_splits,
-                            save_dir=args.obj_embeddings_save_path)
-        # endregion
 
     # region OBJ EMBEDDINGS READING/SAVING
     if args.saved_obj_embeddings_path:
@@ -309,13 +277,7 @@ def main():
 
     # region ZERO-SHOT MODELS TRAINING / INFERENCE
     for dataset_name, dataset_embeddings in embeddings.items():
-        # TODO: add loop for regenerating splits and retraining ZSL net
 
-        # train_embeddings, test_unseen_embeddings, test_seen_embeddings = split_dataset(
-        #      modalities_dict=dataset_embeddings, splits_df=splits_df)
-
-
-        # modalities_dimensions = get_data_dimensions(train_embeddings)
         test_modality = 'img'
         # NOTE: now all loaded modalities are passed to the model, but
         # it shouldn't be a restriction! There can be a situation, where we want to
@@ -323,37 +285,6 @@ def main():
         if args.model == 'cada_vae':
 
             experiment(model_config)
-
-            
-            
-
-        elif args.model == 'clswgan':
-            pass  # TODO: initialize the model with configs
-
-        else:
-            raise NotImplementedError('Unknown network')
-
-        # zsl_unseen_embeddings = model.transform(test_unseen_embeddings)
-        # zsl_seen_embeddings = model.transform(test_seen_embeddings)
-
-        # if args.compute_zsl_train_embeddings:
-        #     zsl_train_embeddings = model.transform(train_embeddings)
-    # endregion
-
-    # region ZSL EMBEDDINGS CACHING
-    # if default.cache_zsl_embeddings:
-    #     train_embeddings_out = model.transform(train_embeddings).detach()
-    #     test_unseen_out = model.transform(test_unseen_embeddings).detach()
-    #     test_seen_out = model.transform(test_seen_embeddings).detach()
-    #     target_dir = default.obj_embeddings_save_path
-    #     file_train = os.path.join(target_dir, 'train.npy')
-    #     ile_unseen = os.path.join(target_dir, 'test_unseen.npy')
-    #     file_seen = os.path.join(target_dir, 'test_seen.npy')
-    #     np.save(file_train, train_embeddings_out.cpu().numpy())
-    #     np.save(file_unseen, test_unseen_out.cpu().numpy())
-    #     np.save(file_seen, test_unseen_out.cpu().numpy())
-    # endregion
-
 
 if __name__ == '__main__':
     main()

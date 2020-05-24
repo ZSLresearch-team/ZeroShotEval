@@ -27,8 +27,10 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
     """
     model.to(config.device)
 
+    if config.verbose > 1:
+        print('\nTrain CADA-VAE model')
+
     tqdm_epoch = trange(config.nepoch, desc='Loss: None. Epoch', unit='epoch', disable=(verbose<=0), leave=True)
-    # tqdm_train_loader = tqdm(train_loader, desc='Batch:', unit='batch', disable=(verbose<=1), leave=False)
 
     loss_history = []
     for epoch in tqdm_epoch:
@@ -36,7 +38,6 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
         model.train()
 
         loss_accum = 0
-        distance_accum = 0
         beta, cross_reconstruction_factor, distance_factor = loss_factors(epoch, config.specific_parameters.warmup)
         tqdm_train_loader = tqdm(train_loader, desc='Loss: None. Batch', unit='batch', disable=(verbose<=1), leave=False)
 
@@ -45,6 +46,7 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
             for modality, modality_tensor in x.items():
                 x[modality] = modality_tensor.to(config.device).float()
                 x[modality].requires_grad = False
+
             x_recon, z_mu, z_logvar, z_noize = model(x)
 
             loss_vae, loss_ca, loss_da = compute_cada_losses(model.decoder, x, x_recon, z_mu, z_logvar, z_noize,
@@ -52,9 +54,9 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
 
             loss = loss_vae
 
-            if use_ca_loss and (loss_ca > 0):
+            if use_ca_loss:
                 loss += loss_ca * cross_reconstruction_factor
-            if use_da_loss and (loss_da > 0):
+            if use_da_loss:
                 loss += loss_da * distance_factor
 
             optimizer.zero_grad()
@@ -62,7 +64,6 @@ def train_VAE(config, model, train_loader, optimizer, use_ca_loss=True, use_da_l
             optimizer.step()
 
             loss_accum += loss.item()
-
             tqdm_train_loader.set_description(f'Loss: {loss_accum / (i_step + 1):.1f}. Batch')
             tqdm_train_loader.refresh()
 
@@ -165,7 +166,7 @@ def compute_da_loss(z_mu_1, z_logvar_1, z_mu_2, z_logvar_2):
     """
 
     loss_mu = (z_mu_1 - z_mu_2).pow(2).sum(dim=1)
-    loss_var = (torch.sqrt(z_logvar_1.exp()) - torch.sqrt(z_logvar_2.exp())).pow(2).sum(dim=1)
+    loss_var = ((z_logvar_1 / 2).exp() - (z_logvar_2 / 2).exp()).pow(2).sum(dim=1)
 
     loss_da = torch.sqrt(loss_mu + loss_var).mean()
 
@@ -347,7 +348,7 @@ def remap_labels(labels, classes):
 
 def VAE_train_procedure(model_config, dataset, gen_syn_data=True, save_model=False, save_dir='../../../model/'):
     """
-    Launches Cada-vae model training and generates zsl_embedding dataset for classifier training.
+    Starts Cada-vae model training and generates zsl_embedding dataset for classifier training.
 
     Args:
         model_config(dict): dictionary with setting for model.
@@ -357,15 +358,14 @@ def VAE_train_procedure(model_config, dataset, gen_syn_data=True, save_model=Fal
         save_dir(str): root to models save dir.
 
     Returns:
-        model: trrained model.
+        model: trained model.
 
     """
-    feature_dimensions = [2048, 312]
     model = VAEModel(hidden_size_encoder=model_config.specific_parameters.hidden_size_encoder,
                      hidden_size_decoder=model_config.specific_parameters.hidden_size_decoder,
                      latent_size=model_config.specific_parameters.latent_size,
                      modalities=dataset.modalities,
-                     feature_dimensions=feature_dimensions,
+                     feature_dimensions=model_config.dataset.feature_dimensions,
                      use_bn=model_config.specific_parameters.use_bn,
                      use_dropout=model_config.specific_parameters.use_dropout
                      )

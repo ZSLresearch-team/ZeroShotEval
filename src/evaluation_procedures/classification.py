@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 import numpy as np
 from sklearn.metrics import confusion_matrix
-from tqdm import trange
+from tqdm import trange, tqdm
 
 class SoftmaxClassifier(nn.Module):
     """
@@ -73,17 +73,16 @@ def train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes,
     acc_H_hist = []
 
     if verbose >= 1:
-        print("Train Classifier")
+        print("\nTrain Classifier")
 
-    tqdm_epoch = trange(n_epoch, desc='Accuracy Seen: None. Unseen: None. H', unit='epoch', disable=(verbose<=0), leave=True)
+    tqdm_epoch = trange(n_epoch, desc='Loss: None. Seen: None. Unseen: None. H', unit='epoch', disable=(verbose<=0), leave=True)
 
     for epoch in tqdm_epoch:
         classifier.train()
-
+        tqdm_train_loader = tqdm(train_loader, desc='Loss: None. Batch', unit='batch', disable=(verbose<=1), leave=False)
         loss_accum = 0
 
-
-        for i_step, (x, y) in enumerate(train_loader):
+        for i_step, (x, y) in enumerate(tqdm_train_loader):
             x = x.to(device)
             y = y.to(device)
 
@@ -95,8 +94,11 @@ def train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes,
             optimizer.step()
 
             loss_accum += loss.item()
+            tqdm_train_loader.set_description(f'Loss: {loss_accum / (i_step + 1):.1f}. Batch')
+            tqdm_train_loader.refresh()
 
-        loss_hist.append(loss_accum / i_step)
+        loss_accum_mean = loss_accum / (i_step +1)
+        loss_hist.append(loss_accum_mean)
 
         # Calculate accuracies
         acc_seen, acc_unseen, acc_H = compute_mean_per_class_accuracies(classifier, test_loader, seen_classes,
@@ -106,7 +108,7 @@ def train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes,
         acc_unseen_hist.append(acc_unseen)
         acc_H_hist.append(acc_H)
 
-        tqdm_epoch.set_description(f'Seen: {acc_seen:.2f}. Unseen: {acc_unseen:.2f}. H: {acc_H:.2f}')
+        tqdm_epoch.set_description(f'Loss: {loss_accum_mean:.1f} Seen: {acc_seen:.2f}. Unseen: {acc_unseen:.2f}. H: {acc_H:.2f}')
         tqdm_epoch.refresh()
 
     return loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist
@@ -192,6 +194,8 @@ def classification_procedure(data, in_features, num_classes, batch_size, device,
         train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes, 
                   unseen_classes, train_loader, test_loader, verbose=verbose)
 
-    print(f'Best accuracy H: {max(acc_H_hist)}')
+    if verbose > 0:
+        best_H_idx = acc_H_hist.index(max(acc_H_hist))
+        print(f'Best accuracy H: {acc_H_hist[best_H_idx]:.4f}, See: {acc_seen_hist[best_H_idx]:.4f}, Unseen: {acc_unseen_hist[best_H_idx]:.4f}')
 
     return train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist

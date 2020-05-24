@@ -85,7 +85,7 @@ class ObjEmbeddingDataset(Dataset):
                     indices_obj = np.append(indices_obj, class_indices)
 
             else:
-                    
+
                 usneen_classes_emb = self.data[modality_name][self.unseen_classes]
                 if not generalized:
                     unseen_labels = np.arange(0, len(self.unseen_classes))
@@ -109,7 +109,7 @@ class ObjEmbeddingDataset(Dataset):
         """
         # Getting CNN features and labels
         if verbose > 1:
-            print(f"Loading computed embeddings and splits from {self.datadir}...")
+            print(f"[INFO] Loading computed embeddings and splits from {self.datadir}...")
 
         cnn_features = sio.loadmat(self.datadir + 'res101.mat')
         feature = cnn_features['features'].T
@@ -128,11 +128,14 @@ class ObjEmbeddingDataset(Dataset):
         scaler = preprocessing.MinMaxScaler()
 
         feature = scaler.fit_transform(feature)
-        
+
         data = {}
         data['img'] = feature
         data['cls_attr'] = class_attr
 
         self.data = data
+
+        if verbose > 1:
+            print('Done!')
 
         return None

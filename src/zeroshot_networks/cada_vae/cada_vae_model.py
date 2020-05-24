@@ -1,6 +1,5 @@
 """
 """
-
 # region IMPORTS
 import torch
 import torch.nn as nn
@@ -28,10 +27,7 @@ class VAEModel(nn.Module):
         Args:
             latent_size: size of models latent space
             modalities: list of modalities to be used
-            feature_dimensions: dictionary mapping modalities names to modalities embedding size. !Temp list
-            For example:
-            {'img': 1024,
-            'cls_attr': 312}
+            feature_dimensions: dictionary mapping modalities names to modalities embedding size. 
         """
         super(VAEModel, self).__init__()
         self.modalities = modalities
@@ -40,13 +36,15 @@ class VAEModel(nn.Module):
         self.latent_size = latent_size
 
         self.encoder = nn.ModuleDict()
-        for modality, dim in zip(self.modalities, feature_dimensions):
-            self.encoder.update({modality: EncoderTemplate(dim, self.hidden_size_encoder[modality],
+        for modality in self.modalities:
+            self.encoder.update({modality: EncoderTemplate(feature_dimensions[modality],
+                                                           self.hidden_size_encoder[modality],
                                                            self.latent_size, *args, **kvargs)})
 
         self.decoder = nn.ModuleDict()
-        for modality, dim in zip(self.modalities, feature_dimensions):
-            self.decoder.update({modality: DecoderTemplate(self.latent_size, self.hidden_size_decoder[modality], dim)})
+        for modality in self.modalities:
+            self.decoder.update({modality: DecoderTemplate(self.latent_size, self.hidden_size_decoder[modality],
+                                                           feature_dimensions[modality])})
 
     def forward(self, x):
         """
@@ -54,7 +52,7 @@ class VAEModel(nn.Module):
             z_mu: dictionary mapping modalities names to mean layer out.
             z_logvar: dictionary mapping modalities names to variance layer out.
             x_recon: dictionary mapping modalities names to decoder out.
-            z_noize: dictionary mapping modalities names to decoder input.
+            z_noize: dictionary mapping modalities names to latent space representation.
         """
         z_mu = {}
         z_logvar = {}

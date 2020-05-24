@@ -7,12 +7,16 @@ from easydict import EasyDict as edict
 
 def experiment(model_config):
     """
-    Launches single experiment
+    Start single experiment
     """
 
-    data = ObjEmbeddingDataset(model_config.cub.path, ['img'], model_config.verbose)
+    if not model_config.generate_obj_emb:
+        pass
+        if model_config.save_obj_emb:
+            pass
+    
+    data = ObjEmbeddingDataset(model_config.dataset.path, ['img'], model_config.verbose)
     zsl_emb_dataset, csl_train_indice, csl_test_indice = VAE_train_procedure(model_config, data)
-
 
     # Train 
     num_classes = data.num_classes if model_config.generalized else data.num_unseen_classes

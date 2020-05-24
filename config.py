@@ -28,7 +28,7 @@ from easydict import EasyDict as edict
 default = edict()
 
 default.model = 'cada_vae'
-default.datasets = 'cub'
+default.datasets = ['cub']
 
 default.modalities = 'img,cls_attr'
 default.img_net = 'resnet101'
@@ -40,7 +40,6 @@ default.generalized_zsl = True
 default.saved_obj_embeddings_path = 'data/CUB/'
 default.obj_embeddings_save_path = 'data/CUB/zsl_emb/'  # path to save computed embeddings
 
-default.cache_zsl_embeddings = False
 default.compute_zsl_train_embeddings = True
 # endregion
 
@@ -52,10 +51,13 @@ model.general_parameters = edict()  # general hyper for all models
 model.general_parameters.device = 'cuda:0'
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
-model.general_parameters.batch_size = 50
+model.general_parameters.batch_size = 64
 model.general_parameters.nepoch = 100
 model.general_parameters.fp16_train_mode = False  # for GPUs with tensor cores
 model.general_parameters.verbose = 2
+model.general_parameters.save_obj_emb = True
+model.general_parameters.save_zsl_embeddings = False
+model.general_parameters.generate_obj_emb = True
 
 # region CADA_VAE CONFIGS
 model.cada_vae = edict()
@@ -89,9 +91,6 @@ model.cada_vae.specific_parameters.samples_per_modality_class.cls_attr = 400
 
 
 model.cada_vae.specific_parameters.hidden_layers = edict()
-model.cada_vae.specific_parameters.hidden_layers.cnn_features = (1560, 1660)
-model.cada_vae.specific_parameters.hidden_layers.attributes = (1450, 665)
-model.cada_vae.specific_parameters.hidden_layers.sentences = (1450, 665)
 model.cada_vae.specific_parameters.input_features_from_cnn = 2048  # for ResNet101
 
 model.cada_vae.specific_parameters.hidden_size_encoder = edict()
@@ -121,7 +120,6 @@ model.cada_vae.specific_parameters.warmup.distance.end_epoch = 22
 model.cada_vae.specific_parameters.warmup.distance.start_epoch = 6
 
 # NOTE: parameter below is for classification task only
-# TODO: transfer auto selection from original repo
 model.cada_vae.specific_parameters.cls_train_steps = 29
 # endregion
 
@@ -142,6 +140,10 @@ dataset.cub = edict()
 dataset.cub.dataset_name = 'cub'
 dataset.cub.path = 'data/CUB/resnet101/'
 dataset.cub.precomputed_embeddings_path = 'data/CUB/res101.mat'
+
+dataset.cub.feature_dimensions = edict()
+dataset.cub.feature_dimensions.img = 2048
+dataset.cub.feature_dimensions.cls_attr = 312
 
 dataset.cub.num_classes = 200
 dataset.cub.num_novel_classes = 50
@@ -187,9 +189,8 @@ def generate_config(parsed_model, parsed_datasets):
 
     datasets = {}
     for dataset_name in parsed_datasets:
-        # datasets[dataset_name] = dataset[dataset_name]
-        # specific_model[dataset_name] = dataset[dataset_name]
-        pass
-    specific_model['cub'] = dataset.cub
+        datasets[dataset_name] = dataset[dataset_name]
+        specific_model['dataset'] = dataset[dataset_name]
+
 
     return specific_model, datasets
