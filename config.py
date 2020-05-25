@@ -172,10 +172,23 @@ dataset.cub.object_embedding.resnet101.path = ''
 # region AWA2 DATASET CONFIGS
 dataset.awa2 = edict()
 dataset.awa2.dataset_name = 'awa2'
-dataset.awa2.path = 'data/AWA2/'
+dataset.awa2.path = 'data/AWA2/resnet101/'
 
 dataset.awa2.num_classes = 50
 dataset.awa2.num_novel_classes = 10
+dataset.awa2.feature_dimensions = edict()
+dataset.awa2.feature_dimensions.img = 2048
+dataset.awa2.feature_dimensions.cls_attr = 85
+
+dataset.sun = edict()
+dataset.sun.dataset_name = 'sun'
+dataset.sun.path = 'data/SUN/resnet101/'
+
+dataset.sun.num_classes = 717
+dataset.sun.num_novel_classes = 10
+dataset.sun.feature_dimensions = edict()
+dataset.sun.feature_dimensions.img = 2048
+dataset.sun.feature_dimensions.cls_attr = 102
 # TODO: complete AWA2 DATASET CONFIGS section
 # endregion
 
