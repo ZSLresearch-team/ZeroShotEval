@@ -78,7 +78,6 @@ def load_arguments():
     args = parser.parse_args()
     args = split_commasep_arguments(args)
     check_arguments(args)
-
     # TODO: process all paths in a loop
     args.saved_obj_embeddings_path = Path(args.saved_obj_embeddings_path)
     args.obj_embeddings_save_path = Path(args.obj_embeddings_save_path)
@@ -282,9 +281,8 @@ def main():
         # NOTE: now all loaded modalities are passed to the model, but
         # it shouldn't be a restriction! There can be a situation, where we want to
         # compare two different models, that are trained on different modalities
-        if args.model == 'cada_vae':
 
-            experiment(model_config)
+        experiment(model_config)
 
 if __name__ == '__main__':
     main()

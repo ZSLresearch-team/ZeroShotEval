@@ -28,7 +28,7 @@ from easydict import EasyDict as edict
 default = edict()
 
 default.model = 'cada_vae'
-default.datasets = ['cub']
+default.datasets = ['sun']
 
 default.modalities = 'img,cls_attr'
 default.img_net = 'resnet101'
@@ -51,13 +51,14 @@ model.general_parameters = edict()  # general hyper for all models
 model.general_parameters.device = 'cuda:0'
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
-model.general_parameters.batch_size = 64
+model.general_parameters.batch_size = 50
 model.general_parameters.nepoch = 100
 model.general_parameters.fp16_train_mode = False  # for GPUs with tensor cores
 model.general_parameters.verbose = 2
 model.general_parameters.save_obj_emb = True
 model.general_parameters.save_zsl_embeddings = False
 model.general_parameters.generate_obj_emb = True
+model.general_parameters.generate_zsl_emb = False
 
 # region CADA_VAE CONFIGS
 model.cada_vae = edict()
@@ -126,6 +127,26 @@ model.cada_vae.specific_parameters.cls_train_steps = 29
 # region CLSWGAN CONFIGS
 model.clswgan = edict()
 model.clswgan.model_name = 'clswgan'
+
+model.clswgan.specific_parameters = edict()
+model.clswgan.specific_parameters.lr_gen_model = 0.0001
+model.clswgan.specific_parameters.latent_size = 128
+model.clswgan.specific_parameters.penalty_factor = 0
+model.clswgan.specific_parameters.beta = 0.01
+model.clswgan.specific_parameters.use_cls_loss = True
+model.clswgan.specific_parameters.sup_cls_n_epoch = 10
+model.clswgan.specific_parameters.n_critic = 5
+model.clswgan.specific_parameters.hidden_size_generator = 4096
+model.clswgan.specific_parameters.hidden_size_discriminator = 4096
+# NOTE: probably for classification task only
+model.cada_vae.specific_parameters.lr_cls = 0.001
+# early stopping nepoch стоит изменить
+model.cada_vae.specific_parameters.auxiliary_data_source = 'attributes'
+
+
+model.cada_vae.specific_parameters.samples_per_modality_class = edict()
+model.cada_vae.specific_parameters.samples_per_modality_class.img = 200
+model.cada_vae.specific_parameters.samples_per_modality_class.cls_attr = 400
 # TODO: complete CLSWGAN CONFIGS section
 # endregion
 
@@ -138,7 +159,7 @@ dataset = edict()
 # region CUB DATASET CONFIGS
 dataset.cub = edict()
 dataset.cub.dataset_name = 'cub'
-dataset.cub.path = 'data/CUB/resnet101/'
+dataset.cub.path = 'data/CUB/'
 dataset.cub.precomputed_embeddings_path = 'data/CUB/res101.mat'
 
 dataset.cub.feature_dimensions = edict()
@@ -172,7 +193,7 @@ dataset.cub.object_embedding.resnet101.path = ''
 # region AWA2 DATASET CONFIGS
 dataset.awa2 = edict()
 dataset.awa2.dataset_name = 'awa2'
-dataset.awa2.path = 'data/AWA2/resnet101/'
+dataset.awa2.path = 'data/AWA2/'
 
 dataset.awa2.num_classes = 50
 dataset.awa2.num_novel_classes = 10
@@ -182,7 +203,7 @@ dataset.awa2.feature_dimensions.cls_attr = 85
 
 dataset.sun = edict()
 dataset.sun.dataset_name = 'sun'
-dataset.sun.path = 'data/SUN/resnet101/'
+dataset.sun.path = 'data/SUN/'
 
 dataset.sun.num_classes = 717
 dataset.sun.num_novel_classes = 10

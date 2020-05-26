@@ -35,6 +35,10 @@ class ObjEmbeddingDataset(Dataset):
         self.num_unseen_classes = len(self.unseen_classes)
         self.num_classes = len(self.seen_classes) + len(self.unseen_classes)
 
+        self.seen_class_mapping = {old_label:new_label for old_label, new_label in zip(self.seen_classes,
+                                                                                       np.arange(self.num_seen_classes))}
+        self.unseen_class_mapping = {old_label:new_label for old_label, new_label in zip(self.unseen_classes,
+                                                                                       np.arange(self.num_unseen_classes))}
         self.modalities = self.data.keys()
         self.object_modalities = object_modalities
         self.class_modalities = list(set(self.modalities) - set(object_modalities))
@@ -43,8 +47,6 @@ class ObjEmbeddingDataset(Dataset):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
 
         sample_label = self.labels[idx]
         sample_data = {}
@@ -111,12 +113,12 @@ class ObjEmbeddingDataset(Dataset):
         if verbose > 1:
             print(f"[INFO] Loading computed embeddings and splits from {self.datadir}...")
 
-        cnn_features = sio.loadmat(self.datadir + 'res101.mat')
+        cnn_features = sio.loadmat(self.datadir + 'resnet101/res101.mat')
         feature = cnn_features['features'].T
         self.labels = cnn_features['labels'].astype(int).squeeze() - 1
 
         # Getting data splits and class attributes
-        att_splits = sio.loadmat(self.datadir + 'att_splits.mat')
+        att_splits = sio.loadmat(self.datadir + 'resnet101/att_splits.mat')
         # numpy array index starts from 0, matlab starts from 1
         self.train_indices = att_splits['trainval_loc'].squeeze() - 1 #--> train_feature = TRAIN SEEN
         self.test_seen_indices = att_splits['test_seen_loc'].squeeze() - 1
