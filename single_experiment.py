@@ -9,7 +9,7 @@ def experiment(model_config):
     """
     Start single experiment
     """
-
+    
     if not model_config.generate_obj_emb:
         pass
         if model_config.save_obj_emb:

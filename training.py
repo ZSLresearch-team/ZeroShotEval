@@ -21,10 +21,6 @@ from config import generate_config
 from single_experiment import experiment
 from src.dataset_loaders.data_loader import load_dataset
 from src.modalities_feature_extractors.modalities_feature_extractor import compute_embeddings
-from src.zeroshot_networks.cada_vae.cada_vae_model import VAEModel 
-from src.zeroshot_networks.cada_vae.cada_vae_train import train_VAE, eval_VAE, VAE_train_procedure
-from src.dataloader.dataset import ObjEmbeddingDataset
-from src.evaluation_procedures.classification import classification_procedure
 
 from ray import tune
 from ray.tune.suggest.bayesopt import BayesOptSearch

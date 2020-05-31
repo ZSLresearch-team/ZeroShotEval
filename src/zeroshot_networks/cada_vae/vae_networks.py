@@ -43,11 +43,11 @@ class EncoderTemplate(nn.Module):
         modules = []
 
         for i in range(len(self.layer_sizes)-2):
-            if use_dropout:
-                modules.append(nn.Dropout(p=0.2))
             modules.append(nn.Linear(self.layer_sizes[i], self.layer_sizes[i+1]))
             if use_bn:
                 modules.append(nn.BatchNorm1d(self.layer_sizes[i+1]))
+            if use_dropout:
+                modules.append(nn.Dropout(p=0.2))
             modules.append(nn.ReLU())
 
         self.feature_encoder = nn.Sequential(*modules)
@@ -62,7 +62,7 @@ class EncoderTemplate(nn.Module):
         Returns:
             z_mu: mean layer out.
             z_logvar: variance layer out.
-            z_noize: latent space representation.
+            z_sample: sample from latent space representation.
         """
         hidden = self.feature_encoder(x)
 
@@ -73,9 +73,9 @@ class EncoderTemplate(nn.Module):
         eps = torch.randn(z_logvar.size()[0], 1).to(z_logvar.device)
         eps = eps.expand(z_logvar.size())
 
-        z_noize = eps * std + z_mu
+        z_sample = eps * std + z_mu
 
-        return z_mu, z_logvar, z_noize
+        return z_mu, z_logvar, z_sample
 
 
 class DecoderTemplate(nn.Module):
