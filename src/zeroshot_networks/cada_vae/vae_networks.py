@@ -3,6 +3,7 @@
 # region IMPORTS
 import torch
 import torch.nn as nn
+
 # endregion
 
 
@@ -15,11 +16,11 @@ def weights_init(m):
         -Try another weight initialization methods.
     """
     classname = m.__class__.__name__
-    if classname.find('Linear') != -1:
+    if classname.find("Linear") != -1:
         m.bias.data.fill_(0)
         nn.init.xavier_uniform_(m.weight, gain=0.5)
 
-    elif classname.find('BatchNorm') != -1:
+    elif classname.find("BatchNorm") != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
 
@@ -36,16 +37,25 @@ class EncoderTemplate(nn.Module):
         use_dropout(bool): if ``True`` - use dropout layers.
     """
 
-    def __init__(self, input_dim, hidden_size_rule, output_dim, use_bn=False, use_dropout=False):
+    def __init__(
+        self,
+        input_dim,
+        hidden_size_rule,
+        output_dim,
+        use_bn=False,
+        use_dropout=False,
+    ):
         super(EncoderTemplate, self).__init__()
 
         self.layer_sizes = [input_dim] + hidden_size_rule + [output_dim]
         modules = []
 
-        for i in range(len(self.layer_sizes)-2):
-            modules.append(nn.Linear(self.layer_sizes[i], self.layer_sizes[i+1]))
+        for i in range(len(self.layer_sizes) - 2):
+            modules.append(
+                nn.Linear(self.layer_sizes[i], self.layer_sizes[i + 1])
+            )
             if use_bn:
-                modules.append(nn.BatchNorm1d(self.layer_sizes[i+1]))
+                modules.append(nn.BatchNorm1d(self.layer_sizes[i + 1]))
             if use_dropout:
                 modules.append(nn.Dropout(p=0.2))
             modules.append(nn.ReLU())
@@ -93,9 +103,10 @@ class DecoderTemplate(nn.Module):
         self.layer_sizes = [input_dim] + hidden_size_rule + [output_dim]
 
         modules = []
-        for i in range(len(self.layer_sizes)-2):
+        for i in range(len(self.layer_sizes) - 2):
             modules.append(
-                nn.Linear(self.layer_sizes[i], self.layer_sizes[i+1]))
+                nn.Linear(self.layer_sizes[i], self.layer_sizes[i + 1])
+            )
             modules.append(nn.ReLU())
 
         modules.append(nn.Linear(self.layer_sizes[-2], self.layer_sizes[-1]))

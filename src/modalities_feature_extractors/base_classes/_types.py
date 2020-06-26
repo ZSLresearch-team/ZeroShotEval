@@ -1,5 +1,5 @@
-from typing import Union, Text
 from os import PathLike
+from typing import Text, Union
 
 import numpy as np
 import torch

@@ -1,11 +1,14 @@
 from abc import ABCMeta
 from os import PathLike
 
-from src.modalities_feature_extractors.base_classes._types import ExtractorType, SourceObject, EmbeddingObject
+from src.modalities_feature_extractors.base_classes._types import (
+    EmbeddingObject,
+    ExtractorType,
+    SourceObject,
+)
 
 
 class EmbeddingExtractor(metaclass=ABCMeta):
-
     def __init__(self, extractor_type: ExtractorType):
         """
         Args:
@@ -22,7 +25,9 @@ class EmbeddingExtractor(metaclass=ABCMeta):
         """
         pass
 
-    def extract_embeddings_recursive_from_dir(self, dir_from: PathLike, dir_to: PathLike) -> PathLike:
+    def extract_embeddings_recursive_from_dir(
+        self, dir_from: PathLike, dir_to: PathLike
+    ) -> PathLike:
         """
         Recursively walk around a directory and extract embeddings for each file
 

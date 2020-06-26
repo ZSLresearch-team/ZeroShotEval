@@ -1,8 +1,8 @@
 """
 """
 
-#region IMPORTS
-#endregion
+# region IMPORTS
+# endregion
 
 
 def verification_procedure():

@@ -1,13 +1,14 @@
 """
 """
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data.sampler import SubsetRandomSampler
-from torch.utils.data import DataLoader
-
-import numpy as np
 from sklearn.metrics import confusion_matrix
-from tqdm import trange, tqdm
+from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
+
+from tqdm import tqdm, trange
+
 
 class SoftmaxClassifier(nn.Module):
     """
@@ -24,6 +25,7 @@ class SoftmaxClassifier(nn.Module):
         x = self.fc(x)
         return x
 
+
 def weights_init(m):
     """
     Weight init.
@@ -33,17 +35,27 @@ def weights_init(m):
         -Try 
     """
     classname = m.__class__.__name__
-    if classname.find('Linear') != -1:
+    if classname.find("Linear") != -1:
         m.bias.data.fill_(0)
         nn.init.xavier_uniform_(m.weight, gain=0.5)
 
-    elif classname.find('BatchNorm') != -1:
+    elif classname.find("BatchNorm") != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
 
 
-def train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes,
-              unseen_classes, train_loader, test_loader, verbose=1):
+def train_cls(
+    classifier,
+    optimizer,
+    device,
+    n_epoch,
+    num_classes,
+    seen_classes,
+    unseen_classes,
+    train_loader,
+    test_loader,
+    verbose=1,
+):
     """
     Train Softmax classifier model
 
@@ -57,7 +69,8 @@ def train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes,
         train_loader: loaer of the train data.
         test_seen_loader: loader of the test seen data.
         test_unseen_loader: loader of the test unseen data.
-        verbose: boolean or Int. The higher value verbose is - the more info you get.
+        verbose: boolean or Int. The higher value verbose is -
+            the more info will you get.
 
     Returns:
         loss_hist(list): train loss history.
@@ -75,11 +88,23 @@ def train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes,
     if verbose >= 1:
         print("\nTrain Classifier")
 
-    tqdm_epoch = trange(n_epoch, desc='Loss: None. Seen: None. Unseen: None. H', unit='epoch', disable=(verbose<=0), leave=True)
+    tqdm_epoch = trange(
+        n_epoch,
+        desc="Loss: None. Seen: None. Unseen: None. H",
+        unit="epoch",
+        disable=(verbose <= 0),
+        leave=True,
+    )
 
     for epoch in tqdm_epoch:
         classifier.train()
-        tqdm_train_loader = tqdm(train_loader, desc='Loss: None. Batch', unit='batch', disable=(verbose<=1), leave=False)
+        tqdm_train_loader = tqdm(
+            train_loader,
+            desc="Loss: None. Batch",
+            unit="batch",
+            disable=(verbose <= 1),
+            leave=False,
+        )
         loss_accum = 0
 
         for i_step, (x, y) in enumerate(tqdm_train_loader):
@@ -94,26 +119,34 @@ def train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes,
             optimizer.step()
 
             loss_accum += loss.item()
-            tqdm_train_loader.set_description(f'Loss: {loss_accum / (i_step + 1):.1f}. Batch')
+            tqdm_train_loader.set_description(
+                f"Loss: {loss_accum / (i_step + 1):.1f}. Batch"
+            )
             tqdm_train_loader.refresh()
 
-        loss_accum_mean = loss_accum / (i_step +1)
+        loss_accum_mean = loss_accum / (i_step + 1)
         loss_hist.append(loss_accum_mean)
 
         # Calculate accuracies
-        acc_seen, acc_unseen, acc_H = compute_mean_per_class_accuracies(classifier, test_loader, seen_classes,
-                                                                        unseen_classes, device)
+        acc_seen, acc_unseen, acc_H = compute_mean_per_class_accuracies(
+            classifier, test_loader, seen_classes, unseen_classes, device
+        )
         # To be reworked
         acc_seen_hist.append(acc_seen)
         acc_unseen_hist.append(acc_unseen)
         acc_H_hist.append(acc_H)
 
-        tqdm_epoch.set_description(f'Loss: {loss_accum_mean:.1f} Seen: {acc_seen:.2f}. Unseen: {acc_unseen:.2f}. H: {acc_H:.2f}')
+        tqdm_epoch.set_description(
+            f"Loss: {loss_accum_mean:.1f} Seen: {acc_seen:.2f}. Unseen: {acc_unseen:.2f}. H: {acc_H:.2f}"
+        )
         tqdm_epoch.refresh()
 
     return loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist
 
-def compute_mean_per_class_accuracies(classifier, loader, seen_classes, unseen_classes, device):
+
+def compute_mean_per_class_accuracies(
+    classifier, loader, seen_classes, unseen_classes, device
+):
     """
     Computes mean per-class accuracies for both seen and unseen classes.
 
@@ -127,7 +160,8 @@ def compute_mean_per_class_accuracies(classifier, loader, seen_classes, unseen_c
     Returns:
         acc_seen: mean per-class accuracy for seen classes.
         acc_unseen: mean per-class accuracy for unseen classes.
-        acc_H: harmonic mean between mean per-class accuracies for seen classes anduanseen classes.
+        acc_H: harmonic mean between mean per-class accuracies for seen classes
+        anduanseen classes.
     """
 
     classifier.eval()
@@ -144,9 +178,16 @@ def compute_mean_per_class_accuracies(classifier, loader, seen_classes, unseen_c
             labels_all = torch.cat((labels_all, y), 0)
             preds_all = torch.cat((preds_all, preds.long()), 0)
 
-    conf_matrix = confusion_matrix(labels_all.cpu().numpy(), preds_all.cpu().numpy())
-    acc_seen = (np.diag(conf_matrix)[seen_classes] / conf_matrix.sum(1)[seen_classes]).mean()
-    acc_unseen = (np.diag(conf_matrix)[unseen_classes] / conf_matrix.sum(1)[unseen_classes]).mean()
+    conf_matrix = confusion_matrix(
+        labels_all.cpu().numpy(), preds_all.cpu().numpy()
+    )
+    acc_seen = (
+        np.diag(conf_matrix)[seen_classes] / conf_matrix.sum(1)[seen_classes]
+    ).mean()
+    acc_unseen = (
+        np.diag(conf_matrix)[unseen_classes]
+        / conf_matrix.sum(1)[unseen_classes]
+    ).mean()
 
     if (acc_unseen < 1e-4) or (acc_seen < 1e-4):
         acc_H = 0
@@ -155,15 +196,28 @@ def compute_mean_per_class_accuracies(classifier, loader, seen_classes, unseen_c
 
     return acc_seen, acc_unseen, acc_H
 
-def classification_procedure(data, in_features, num_classes, batch_size, device, n_epoch, lr,
-                             train_indicies, test_indicies, seen_classes, unseen_classes, verbose):
+
+def classification_procedure(
+    data,
+    in_features,
+    num_classes,
+    batch_size,
+    device,
+    n_epoch,
+    lr,
+    train_indicies,
+    test_indicies,
+    seen_classes,
+    unseen_classes,
+    verbose,
+):
     """
     Launches classifier training.
 
     Args:
-        data:
-        in_features:
-        num_classes:
+        data: torch dataset
+        in_features(int): number of input features.
+        num_classes(int): number of classes.
         batch_size(Int): batch size for classifier training.
         device(str): model device.
         n_epoch(int): number of epochs to train.
@@ -172,7 +226,8 @@ def classification_procedure(data, in_features, num_classes, batch_size, device,
         test_indices: inicies of testing data.
         seen_classes(numpy array): labels of seen classes.
         unseen_classes(numpy array): labels of unseen classes.
-        verbose: boolean or Int. The higher value verbose is - the more info you get.
+        verbose: boolean or Int. The higher value verbose is - the more info
+            you get.
     
     Returns:
         loss_hist(list): train loss history.
@@ -185,17 +240,34 @@ def classification_procedure(data, in_features, num_classes, batch_size, device,
     train_sampler = SubsetRandomSampler(train_indicies)
     test_sampler = SubsetRandomSampler(test_indicies)
 
-    train_loader = DataLoader(data, batch_size=batch_size, sampler=train_sampler)
+    train_loader = DataLoader(
+        data, batch_size=batch_size, sampler=train_sampler
+    )
     test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sampler)
 
-    optimizer = torch.optim.Adam(classifier.parameters(), lr=lr, betas=(0.9, 0.999))
+    optimizer = torch.optim.Adam(
+        classifier.parameters(), lr=lr, betas=(0.9, 0.999)
+    )
 
-    train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist = \
-        train_cls(classifier, optimizer, device, n_epoch, num_classes, seen_classes, 
-                  unseen_classes, train_loader, test_loader, verbose=verbose)
+    train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist = train_cls(
+        classifier,
+        optimizer,
+        device,
+        n_epoch,
+        num_classes,
+        seen_classes,
+        unseen_classes,
+        train_loader,
+        test_loader,
+        verbose=verbose,
+    )
 
     if verbose > 0:
         best_H_idx = acc_H_hist.index(max(acc_H_hist))
-        print(f'Best accuracy H: {acc_H_hist[best_H_idx]:.4f}, See: {acc_seen_hist[best_H_idx]:.4f}, Unseen: {acc_unseen_hist[best_H_idx]:.4f}')
+        print(
+            f"Best accuracy H: {acc_H_hist[best_H_idx]:.4f}, "
+            f"Seen: {acc_seen_hist[best_H_idx]:.4f}, "
+            f"Unseen: {acc_unseen_hist[best_H_idx]:.4f}"
+        )
 
     return train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist

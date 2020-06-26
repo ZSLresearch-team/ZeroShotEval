@@ -23,22 +23,23 @@ Datasets:
 
 from easydict import EasyDict as edict
 
-
 # region GLOBAL DEFAULT CONFIGS
 default = edict()
 
-default.model = 'cada_vae'
-default.datasets = ['cub']
+default.model = "cada_vae"
+default.datasets = ["cub"]
 
-default.modalities = 'img,cls_attr'
-default.img_net = 'resnet101'
-default.cls_attr_net = 'word2vec'
+default.modalities = "img,cls_attr"
+default.img_net = "resnet101"
+default.cls_attr_net = "word2vec"
 
 default.generalized_zsl = True
 
 # path to stored object embeddings to load
-default.saved_obj_embeddings_path = 'data/CUB/'
-default.obj_embeddings_save_path = 'data/CUB/zsl_emb/'  # path to save computed embeddings
+default.saved_obj_embeddings_path = "data/CUB/"
+default.obj_embeddings_save_path = (
+    "data/CUB/zsl_emb/"  # path to save computed embeddings
+)
 
 default.compute_zsl_train_embeddings = True
 # endregion
@@ -48,7 +49,7 @@ default.compute_zsl_train_embeddings = True
 model = edict()
 
 model.general_parameters = edict()  # general hyper for all models
-model.general_parameters.device = 'cuda:0'
+model.general_parameters.device = "cuda:0"
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
 model.general_parameters.batch_size = 30
@@ -62,14 +63,14 @@ model.general_parameters.generate_zsl_emb = True
 
 # region CADA_VAE CONFIGS
 model.cada_vae = edict()
-model.cada_vae.model_name = 'cada_vae'
-model.cada_vae.distance = 'wasserstein'
+model.cada_vae.model_name = "cada_vae"
+model.cada_vae.distance = "wasserstein"
 model.cada_vae.cross_resonstuction = True
 model.cada_vae.distibution_allignment = True
 
 model.cada_vae.specific_parameters = edict()
 model.cada_vae.specific_parameters.lr_gen_model = 0.00015
-model.cada_vae.specific_parameters.loss = 'l1'
+model.cada_vae.specific_parameters.loss = "l1"
 model.cada_vae.specific_parameters.latent_size = 64
 model.cada_vae.specific_parameters.use_bn = False
 model.cada_vae.specific_parameters.use_dropout = False
@@ -79,7 +80,7 @@ model.cada_vae.specific_parameters.lr_cls = 0.001
 # early stopping nepoch стоит изменить
 model.cada_vae.specific_parameters.cls_train_epochs = 30
 # для общности следует переделать эту и связанные части
-model.cada_vae.specific_parameters.auxiliary_data_source = 'attributes'
+model.cada_vae.specific_parameters.auxiliary_data_source = "attributes"
 
 
 model.cada_vae.specific_parameters.samples_per_modality_class = edict()
@@ -92,7 +93,9 @@ model.cada_vae.specific_parameters.samples_per_modality_class.cls_attr = 400
 
 
 model.cada_vae.specific_parameters.hidden_layers = edict()
-model.cada_vae.specific_parameters.input_features_from_cnn = 2048  # for ResNet101
+model.cada_vae.specific_parameters.input_features_from_cnn = (
+    2048  # for ResNet101
+)
 
 model.cada_vae.specific_parameters.hidden_size_encoder = edict()
 model.cada_vae.specific_parameters.hidden_size_encoder.img = [1560]
@@ -126,7 +129,7 @@ model.cada_vae.specific_parameters.cls_train_steps = 29
 
 # region CLSWGAN CONFIGS
 model.clswgan = edict()
-model.clswgan.model_name = 'clswgan'
+model.clswgan.model_name = "clswgan"
 
 model.clswgan.specific_parameters = edict()
 model.clswgan.specific_parameters.lr_gen_model = 0.0001
@@ -141,7 +144,7 @@ model.clswgan.specific_parameters.hidden_size_discriminator = 4096
 # NOTE: probably for classification task only
 model.cada_vae.specific_parameters.lr_cls = 0.001
 # early stopping nepoch стоит изменить
-model.cada_vae.specific_parameters.auxiliary_data_source = 'attributes'
+model.cada_vae.specific_parameters.auxiliary_data_source = "attributes"
 
 
 model.cada_vae.specific_parameters.samples_per_modality_class = edict()
@@ -158,9 +161,9 @@ dataset = edict()
 
 # region CUB DATASET CONFIGS
 dataset.cub = edict()
-dataset.cub.dataset_name = 'cub'
-dataset.cub.path = '/home/mlitvinov/zsl/ZSLConstructor/data/CUB/'
-dataset.cub.precomputed_embeddings_path = 'data/CUB/res101.mat'
+dataset.cub.dataset_name = "cub"
+dataset.cub.path = "/home/mlitvinov/zsl/ZSLConstructor/data/CUB/"
+dataset.cub.precomputed_embeddings_path = "data/CUB/res101.mat"
 
 dataset.cub.feature_dimensions = edict()
 dataset.cub.feature_dimensions.img = 2048
@@ -175,25 +178,25 @@ dataset.cub.samples_per_class = (200, 0, 400, 0)
 dataset.cub.class_embedding = edict()
 
 dataset.cub.class_embedding.description_emb = edict()
-dataset.cub.class_embedding.description_emb.module_name = ''
-dataset.cub.class_embedding.description_emb.class_name = ''
+dataset.cub.class_embedding.description_emb.module_name = ""
+dataset.cub.class_embedding.description_emb.class_name = ""
 dataset.cub.class_embedding.description_emb.have_pretrained = True
-dataset.cub.class_embedding.description_emb.path = ''
+dataset.cub.class_embedding.description_emb.path = ""
 
 dataset.cub.object_embedding = edict()
 
 dataset.cub.object_embedding.resnet101 = edict()
 
-dataset.cub.object_embedding.resnet101.module_name = ''
-dataset.cub.object_embedding.resnet101.class_name = ''
+dataset.cub.object_embedding.resnet101.module_name = ""
+dataset.cub.object_embedding.resnet101.class_name = ""
 dataset.cub.object_embedding.resnet101.have_pretrained = True
-dataset.cub.object_embedding.resnet101.path = ''
+dataset.cub.object_embedding.resnet101.path = ""
 # endregion
 
 # region AWA2 DATASET CONFIGS
 dataset.awa2 = edict()
-dataset.awa2.dataset_name = 'awa2'
-dataset.awa2.path = 'data/AWA2/'
+dataset.awa2.dataset_name = "awa2"
+dataset.awa2.path = "data/AWA2/"
 
 dataset.awa2.num_classes = 50
 dataset.awa2.num_novel_classes = 10
@@ -202,8 +205,8 @@ dataset.awa2.feature_dimensions.img = 2048
 dataset.awa2.feature_dimensions.cls_attr = 85
 
 dataset.sun = edict()
-dataset.sun.dataset_name = 'sun'
-dataset.sun.path = 'data/SUN/'
+dataset.sun.dataset_name = "sun"
+dataset.sun.path = "data/SUN/"
 
 dataset.sun.num_classes = 717
 dataset.sun.num_novel_classes = 10
@@ -224,7 +227,6 @@ def generate_config(parsed_model, parsed_datasets):
     datasets = {}
     for dataset_name in parsed_datasets:
         datasets[dataset_name] = dataset[dataset_name]
-        specific_model['dataset'] = dataset[dataset_name]
-
+        specific_model["dataset"] = dataset[dataset_name]
 
     return specific_model, datasets

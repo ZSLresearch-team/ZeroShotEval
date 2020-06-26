@@ -12,14 +12,14 @@ returns it.
 
 
 def load_dataset(dataset_name, modalities, path):
-    if dataset_name == 'cub':
+    if dataset_name == "cub":
         # return load_cub(modalities, path)
         pass
-    
-    elif dataset_name == 'awa2':
+
+    elif dataset_name == "awa2":
         # return load_awa2(modalities, path)
         pass
-    
+
     # NOTE: add other datasets loading here
     # elif dataset_name ==
     # ...

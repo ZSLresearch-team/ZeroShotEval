@@ -1,8 +1,9 @@
-import pandas as pd
 from math import ceil
 
+import pandas as pd
 
-class PandasBatchIterator():
+
+class PandasBatchIterator:
     """Iterates pandas dataframe in batches
     """
 
@@ -47,11 +48,12 @@ class PandasBatchIterator():
             end_idx = cur_idx + self._batch_size - 1
 
             if self._columns:
-                batch = self._dataframe.loc[cur_idx: end_idx, self._columns]
+                batch = self._dataframe.loc[cur_idx:end_idx, self._columns]
             else:
-                batch = self._dataframe.loc[cur_idx: end_idx]
+                batch = self._dataframe.loc[cur_idx:end_idx]
 
             yield batch
+
 
 # #%%
 # import pandas as pd
