@@ -1,8 +1,11 @@
 from easydict import EasyDict as edict
+
 from load_zsl_embeddings import load_zsl_emb
-from src.dataloader.dataset import ObjEmbeddingDataset
-from src.evaluation_procedures.classification import classification_procedure
-from src.zeroshot_networks.cada_vae.cada_vae_train import VAE_train_procedure
+from zeroshoteval.dataset.dataset import ObjEmbeddingDataset
+from zeroshoteval.proc.evaluation.classification import classification_procedure
+from zeroshoteval.proc.zeroshotnet.cada_vae.cada_vae_train import (
+    VAE_train_procedure,
+)
 
 
 def experiment(model_config):

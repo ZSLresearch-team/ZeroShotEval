@@ -5,20 +5,12 @@ from logging import getLogger
 from typing import Optional
 
 from torch import Tensor, cuda, nn
-
-from src.modalities_feature_extractors.base_classes._types import (
-    EmbeddingObject,
-    ExtractorType,
-    ImageObject,
-)
-from src.modalities_feature_extractors.base_classes.base import (
-    EmbeddingExtractor,
-)
-from src.modalities_feature_extractors.base_classes.exceptions import (
-    ExtractorTypeError,
-)
 from torchvision import transforms
 from torchvision.models.resnet import resnet101
+
+from .base_classes._types import EmbeddingObject, ExtractorType, ImageObject
+from .base_classes.base import EmbeddingExtractor
+from .base_classes.exceptions import ExtractorTypeError
 
 
 class ImageEmbeddingExtractor(EmbeddingExtractor):

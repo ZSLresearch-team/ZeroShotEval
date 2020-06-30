@@ -1,13 +1,10 @@
 """
 """
 
-from src.modalities_feature_extractors.attributes_embedding_extractor import (
-    AttributesEmbeddingExtractor,
-)
-from src.modalities_feature_extractors.image_embedding_extractor import (
-    ImageEmbeddingExtractor,
-)
-from utils.pandas_batch_iterator import PandasBatchIterator
+from .attributes_embedding_extractor import AttributesEmbeddingExtractor
+from .image_embedding_extractor import ImageEmbeddingExtractor
+
+# from utils.pandas_batch_iterator import PandasBatchIterator
 
 
 def compute_embeddings(modalities_dict):

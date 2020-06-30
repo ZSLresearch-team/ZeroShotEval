@@ -49,11 +49,11 @@ default.compute_zsl_train_embeddings = True
 model = edict()
 
 model.general_parameters = edict()  # general hyper for all models
-model.general_parameters.device = "cuda:0"
+model.general_parameters.device = "cpu"
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
 model.general_parameters.batch_size = 30
-model.general_parameters.nepoch = 100
+model.general_parameters.nepoch = 1
 model.general_parameters.fp16_train_mode = False  # for GPUs with tensor cores
 model.general_parameters.verbose = 2
 model.general_parameters.save_obj_emb = True
@@ -162,7 +162,7 @@ dataset = edict()
 # region CUB DATASET CONFIGS
 dataset.cub = edict()
 dataset.cub.dataset_name = "cub"
-dataset.cub.path = "/home/mlitvinov/zsl/ZSLConstructor/data/CUB/"
+dataset.cub.path = "data/CUB/"
 dataset.cub.precomputed_embeddings_path = "data/CUB/res101.mat"
 
 dataset.cub.feature_dimensions = edict()

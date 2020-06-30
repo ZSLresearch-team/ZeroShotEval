@@ -1,11 +1,7 @@
 from abc import ABCMeta
 from os import PathLike
 
-from src.modalities_feature_extractors.base_classes._types import (
-    EmbeddingObject,
-    ExtractorType,
-    SourceObject,
-)
+from ._types import EmbeddingObject, ExtractorType, SourceObject
 
 
 class EmbeddingExtractor(metaclass=ABCMeta):

@@ -4,16 +4,12 @@
 # import ...
 # ...
 
-from src.modalities_feature_extractors.base_classes._types import (  # , AttributeObject
-    EmbeddingObject,
+from .base_classes._types import (
+    EmbeddingObject,  # , AttributeObject
     ExtractorType,
 )
-from src.modalities_feature_extractors.base_classes.base import (
-    EmbeddingExtractor,
-)
-from src.modalities_feature_extractors.base_classes.exceptions import (
-    ExtractorTypeError,
-)
+from .base_classes.base import EmbeddingExtractor
+from .base_classes.exceptions import ExtractorTypeError
 
 
 class AttributesEmbeddingExtractor(EmbeddingExtractor):

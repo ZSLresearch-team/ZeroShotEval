@@ -5,6 +5,7 @@
 import argparse
 import copy
 import os
+import pathlib
 import pickle
 from pathlib import Path
 
@@ -14,12 +15,10 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data.sampler import SequentialSampler, SubsetRandomSampler
 
-from config import default, generate_config
-from ray import tune
-from ray.tune.suggest.bayesopt import BayesOptSearch
 from single_experiment import experiment
-from src.dataset_loaders.data_loader import load_dataset
-from src.modalities_feature_extractors.modalities_feature_extractor import (
+from zeroshoteval.config.config import default, generate_config
+from zeroshoteval.misc.data_loader import load_dataset
+from zeroshoteval.proc.feature_extraction.modalities_feature_extractor import (
     compute_embeddings,
 )
 
@@ -326,16 +325,14 @@ def main():
     embeddings = filter_modalities(embeddings, args.modalities)
     # embeddings = extend_cls_attributes(embeddings, datasets_labels)
     # endregion
-
     # region ZERO-SHOT MODELS TRAINING / INFERENCE
-    for dataset_name, dataset_embeddings in embeddings.items():
 
-        test_modality = "img"
-        # NOTE: now all loaded modalities are passed to the model, but
-        # it shouldn't be a restriction! There can be a situation, where we want to
-        # compare two different models, that are trained on different modalities
-
-        experiment(model_config)
+    test_modality = "img"
+    # NOTE: now all loaded modalities are passed to the model, but
+    # it shouldn't be a restriction! There can be a situation, where we want to
+    # compare two different models, that are trained on different modalities
+    print(pathlib.Path(__file__).parent.absolute())
+    experiment(model_config)
 
 
 if __name__ == "__main__":

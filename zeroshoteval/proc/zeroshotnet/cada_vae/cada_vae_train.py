@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data.sampler import SequentialSampler, SubsetRandomSampler
-
 from tqdm import tqdm, trange
 
 from .cada_vae_model import VAEModel
@@ -113,7 +112,9 @@ def train_VAE(
     return loss_history
 
 
-def eval_VAE(model, test_loader, test_modality, reparametrize_with_noise=True):
+def eval_VAE(
+    model, test_loader, test_modality, device, reparametrize_with_noise=True
+):
     """
     Calculate zsl embeddings for given VAE model and data.
 
@@ -121,6 +122,7 @@ def eval_VAE(model, test_loader, test_modality, reparametrize_with_noise=True):
         model: VAE model.
         test_loader: test dataloader.
         test_modality: modality name for modality to test.
+        device: device to use for inference.
 
     Returns:
         zsl_emb: zero shot learning embeddings for given data and model
@@ -132,11 +134,11 @@ def eval_VAE(model, test_loader, test_modality, reparametrize_with_noise=True):
         labels = torch.Tensor().long().to("cpu")
 
         for _i_step, (x, _y) in enumerate(test_loader):
-            # !
+
             if test_modality == "img":
-                x = x[test_modality].float().to("cuda:0")
+                x = x[test_modality].float().to("cpu")
             else:
-                x = x.float().to("cuda:0")
+                x = x.float().to("cpu")
             z_mu, _z_logvar, z_noize = model.encoder[test_modality](x)
 
             if reparametrize_with_noise:
@@ -399,7 +401,9 @@ def generate_synthetic_dataset(model_config, dataset, model):
             dataset, batch_size=model_config.batch_size, sampler=sampler
         )
 
-        zsl_emb_img, zsl_emb_labels_img = eval_VAE(model, loader, "img")
+        zsl_emb_img, zsl_emb_labels_img = eval_VAE(
+            model, loader, "img", model_config.device
+        )
     else:
         zsl_emb_img = torch.FloatTensor()
         zsl_emb_labels_img = torch.LongTensor()
@@ -411,7 +415,9 @@ def generate_synthetic_dataset(model_config, dataset, model):
 
     loader = DataLoader(zsl_emb_dataset, batch_size=model_config.batch_size)
 
-    zsl_emb_cls_attr, labels_cls_attr = eval_VAE(model, loader, "cls_attr")
+    zsl_emb_cls_attr, labels_cls_attr = eval_VAE(
+        model, loader, "cls_attr", model_config.device
+    )
     if not model_config.generalized:
         labels_cls_attr = remap_labels(
             labels_cls_attr.cpu().numpy(), dataset.unseen_classes
@@ -429,7 +435,11 @@ def generate_synthetic_dataset(model_config, dataset, model):
     )
 
     zsl_emb_test, zsl_emb_labels_test = eval_VAE(
-        model, loader, "img", reparametrize_with_noise=False
+        model,
+        loader,
+        "img",
+        model_config.device,
+        reparametrize_with_noise=False,
     )
 
     # Create zsl embeddings dataset

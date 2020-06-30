@@ -4,7 +4,7 @@
 import argparse
 
 from config import config
-from src.evaluation_procedures.classification import classification_procedure
+from zeroshoteval.proc.evaluation.classification import classification_procedure
 
 # from src.evaluation_procedures.verification import
 # from src.evaluation_procedures.cluster_measurement import
