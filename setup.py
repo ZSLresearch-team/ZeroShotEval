@@ -5,8 +5,9 @@ from setuptools import find_packages, setup
 setup(
     name="zeroshoteval",
     version="0.1.0",
-    url="unknown",
-    description="SlowFast Video Understanding",
+    author="ZSLresearch team"
+    url="https://github.com/ZSLresearch-team/ZeroShotEval/",
+    description="Python zero-shot learning toolkit",
     install_requires=[
         "yacs>=0.1.6",
         "matplotlib",
