@@ -8,7 +8,7 @@ from torch.utils.data.sampler import SequentialSampler, SubsetRandomSampler
 from tqdm import tqdm, trange
 
 from .cada_vae_model import VAEModel
-
+from ..build import ZSL_MODEL_REGISTRY
 
 def train_VAE(
     config,
@@ -479,6 +479,7 @@ def remap_labels(labels, classes):
     return np.vectorize(remapping_dict.get)(labels)
 
 
+@ZSL_MODEL_REGISTRY.register()
 def VAE_train_procedure(
     model_config,
     dataset,
@@ -495,7 +496,7 @@ def VAE_train_procedure(
         dataset: dataset for training and evaluating.
         gen_sen_data(bool): if ``True`` generates synthetic data for classifier
             after training.
-        save_model(bool):  if ``True``saves model. 
+        save_model(bool):  if ``True`` saves model. 
         save_dir(str): root to models save dir.
 
     Returns:

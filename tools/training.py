@@ -331,7 +331,6 @@ def main():
     # NOTE: now all loaded modalities are passed to the model, but
     # it shouldn't be a restriction! There can be a situation, where we want to
     # compare two different models, that are trained on different modalities
-    print(pathlib.Path(__file__).parent.absolute())
     experiment(model_config)
 
 

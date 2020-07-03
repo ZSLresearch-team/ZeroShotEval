@@ -3,9 +3,7 @@ from easydict import EasyDict as edict
 from load_zsl_embeddings import load_zsl_emb
 from zeroshoteval.dataset.dataset import ObjEmbeddingDataset
 from zeroshoteval.proc.evaluation.classification import classification_procedure
-from zeroshoteval.proc.zeroshotnet.cada_vae.cada_vae_train import (
-    VAE_train_procedure,
-)
+from zeroshoteval.proc.zeroshotnet.build import build_zsl
 
 
 def experiment(model_config):
@@ -27,7 +25,7 @@ def experiment(model_config):
             zsl_emb_dataset,
             csl_train_indice,
             csl_test_indice,
-        ) = VAE_train_procedure(model_config, data)
+        ) = build_zsl("VAE_train_procedure")(model_config, data)
     else:
         zsl_emb_dataset, csl_train_indice, csl_test_indice = load_zsl_emb(
             model_config.dataset.path
