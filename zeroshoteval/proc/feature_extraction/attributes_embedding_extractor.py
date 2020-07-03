@@ -4,10 +4,8 @@
 # import ...
 # ...
 
-from .base_classes._types import (
-    EmbeddingObject,  # , AttributeObject
-    ExtractorType,
-)
+from .base_classes._types import EmbeddingObject  # , AttributeObject
+from .base_classes._types import ExtractorType
 from .base_classes.base import EmbeddingExtractor
 from .base_classes.exceptions import ExtractorTypeError
 

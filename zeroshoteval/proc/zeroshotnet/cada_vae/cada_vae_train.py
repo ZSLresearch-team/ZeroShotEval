@@ -7,8 +7,9 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data.sampler import SequentialSampler, SubsetRandomSampler
 from tqdm import tqdm, trange
 
-from .cada_vae_model import VAEModel
 from ..build import ZSL_MODEL_REGISTRY
+from .cada_vae_model import VAEModel
+
 
 def train_VAE(
     config,

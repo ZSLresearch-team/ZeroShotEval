@@ -21,11 +21,9 @@ def experiment(model_config):
     )
 
     if model_config.generate_zsl_emb:
-        (
-            zsl_emb_dataset,
-            csl_train_indice,
-            csl_test_indice,
-        ) = build_zsl("VAE_train_procedure")(model_config, data)
+        (zsl_emb_dataset, csl_train_indice, csl_test_indice,) = build_zsl(
+            "VAE_train_procedure"
+        )(model_config, data)
     else:
         zsl_emb_dataset, csl_train_indice, csl_test_indice = load_zsl_emb(
             model_config.dataset.path
