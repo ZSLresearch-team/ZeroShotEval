@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name="zeroshoteval",
     version="0.1.0",
-    author="ZSLresearch team"
+    author="ZSLresearch team",
     url="https://github.com/ZSLresearch-team/ZeroShotEval/",
     description="Python zero-shot learning toolkit",
     install_requires=[

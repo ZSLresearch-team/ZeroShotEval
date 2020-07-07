@@ -131,25 +131,25 @@ def eval_VAE(
     model.eval()
 
     with torch.no_grad():
-        zsl_emb = torch.Tensor().to("cpu")
-        labels = torch.Tensor().long().to("cpu")
+        zsl_emb = torch.Tensor().to(device)
+        labels = torch.Tensor().long().to(device)
 
         for _i_step, (x, _y) in enumerate(test_loader):
 
             if test_modality == "img":
-                x = x[test_modality].float().to("cpu")
+                x = x[test_modality].float().to(device)
             else:
-                x = x.float().to("cpu")
+                x = x.float().to(device)
             z_mu, _z_logvar, z_noize = model.encoder[test_modality](x)
 
             if reparametrize_with_noise:
-                zsl_emb = torch.cat((zsl_emb, z_noize.to("cpu")), 0)
+                zsl_emb = torch.cat((zsl_emb, z_noize.to(device)), 0)
             else:
-                zsl_emb = torch.cat((zsl_emb, z_mu.to("cpu")), 0)
+                zsl_emb = torch.cat((zsl_emb, z_mu.to(device)), 0)
 
-            labels = torch.cat((labels, _y.long()), 0)
+            labels = torch.cat((labels, _y.long().to(device)), 0)
 
-    return zsl_emb.to("cpu"), labels
+    return zsl_emb.to(device), labels
 
 
 def compute_cada_losses(

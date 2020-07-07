@@ -49,7 +49,7 @@ default.compute_zsl_train_embeddings = True
 model = edict()
 
 model.general_parameters = edict()  # general hyper for all models
-model.general_parameters.device = "cpu"
+model.general_parameters.device = "cuda: 0"
 model.general_parameters.num_shots = 0
 model.general_parameters.generalized = True
 model.general_parameters.batch_size = 50
