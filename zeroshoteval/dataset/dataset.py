@@ -1,6 +1,6 @@
 import numpy as np
-import scipy.io as sio
 import torch
+from scipy import io as sio
 from sklearn import preprocessing
 from torch.utils.data import Dataset
 
@@ -11,11 +11,11 @@ class ObjEmbeddingDataset(Dataset):
     def __init__(self, datadir, object_modalities, verbose=1):
         """
         Args:
-            data(dict): dict mapping modalities name to modalities object 
+            data(dict): dict mapping modalities name to modalities object
                 embeddings.
             labels: list of ground truth labels for objects.
             split_df: pandas dataframe with dataset splits
-            object_modalities: list of modalities names, wich describes 
+            object_modalities: list of modalities names, wich describes
                 objects, not classes.
         """
         self.datadir = datadir
@@ -47,7 +47,7 @@ class ObjEmbeddingDataset(Dataset):
                 self.unseen_classes, np.arange(self.num_unseen_classes)
             )
         }
-        self.modalities = self.data.keys()
+        self.modalities = [mod.upper() for mod in self.data.keys()]
         self.object_modalities = object_modalities
         self.class_modalities = list(
             set(self.modalities) - set(object_modalities)
@@ -65,8 +65,11 @@ class ObjEmbeddingDataset(Dataset):
             if modality_name in self.object_modalities:
                 sample_data[modality_name] = modality_data[idx]
 
-            else:
+            elif modality_name in self.class_modalities:
                 sample_data[modality_name] = modality_data[sample_label]
+
+            else:
+                raise Exception(f"No {modality_name} in modalities list")
 
         return sample_data, sample_label
 
@@ -75,8 +78,8 @@ class ObjEmbeddingDataset(Dataset):
         Creates indices of dataset to create zsl embeddings dataset.
 
         Args:
-            samples_per_modality_class(dict): dictionary mapping modality names 
-                to its samples per class
+            samples_per_modality_class(CfgNode): samples generated per class
+                for each modality.
             generalized(bool): if ``True`` get indices for generalized mod,
                 if ``False`` -
             for few-shot learning
@@ -142,12 +145,12 @@ class ObjEmbeddingDataset(Dataset):
                 f"[INFO] Loading computed embeddings and splits from {self.datadir}..."
             )
 
-        cnn_features = sio.loadmat(self.datadir + "resnet101/res101.mat")
+        cnn_features = sio.loadmat(self.datadir + "res101.mat")
         feature = cnn_features["features"].T
         self.labels = cnn_features["labels"].astype(int).squeeze() - 1
 
         # Getting data splits and class attributes
-        att_splits = sio.loadmat(self.datadir + "resnet101/att_splits.mat")
+        att_splits = sio.loadmat(self.datadir + "att_splits.mat")
         # numpy array index starts from 0, matlab starts from 1
         self.train_indices = (
             att_splits["trainval_loc"].squeeze() - 1
@@ -165,8 +168,8 @@ class ObjEmbeddingDataset(Dataset):
         feature = scaler.fit_transform(feature)
 
         data = {}
-        data["img"] = feature
-        data["cls_attr"] = class_attr
+        data["IMG"] = feature
+        data["CLS_ATTR"] = class_attr
 
         self.data = data
 

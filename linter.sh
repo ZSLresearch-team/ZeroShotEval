@@ -1,9 +1,9 @@
 # Run this script at project root by ".linter.sh" before you commit.
 echo "Running isort..."
-isort -y -sp .
+isort -sp .
 
 echo "Running black..."
-black -l 80 .
+black -l 80 -t py38 .
 
 echo "Running flake..."
 flake8 .

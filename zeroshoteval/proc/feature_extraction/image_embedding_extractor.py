@@ -1,12 +1,11 @@
 """
 """
-
-from logging import getLogger
-from typing import Optional
-
 from torch import Tensor, cuda, nn
 from torchvision import transforms
 from torchvision.models.resnet import resnet101
+
+from logging import getLogger
+from typing import Optional
 
 from .base_classes._types import EmbeddingObject, ExtractorType, ImageObject
 from .base_classes.base import EmbeddingExtractor

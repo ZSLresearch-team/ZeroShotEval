@@ -15,17 +15,17 @@ https://www.dropbox.com/sh/btoc495ytfbnbat/AAAaurkoKnnk0uV-swgF-gdSa?dl=0
 In other case you will catch a lot of errors!
 """
 
+import numpy as np
+import pandas as pd
+from scipy import io as sio
+from sklearn import preprocessing
+
 # region IMPORTS
 import argparse
 import json
 import os
 import pickle
 from pathlib import Path
-
-import numpy as np
-import pandas as pd
-import scipy.io as sio
-from sklearn import preprocessing
 
 # endregion
 

@@ -1,10 +1,9 @@
+import numpy as np
+
 import os
 import os.path
 import random
 import sys
-
-import numpy as np
-
 import tensorflow as tf
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"

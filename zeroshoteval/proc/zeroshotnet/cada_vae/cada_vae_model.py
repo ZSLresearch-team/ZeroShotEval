@@ -1,8 +1,7 @@
 """
 """
 # region IMPORTS
-import torch
-import torch.nn as nn
+from torch import nn as nn
 
 from .vae_networks import DecoderTemplate, EncoderTemplate
 
@@ -25,14 +24,14 @@ class VAEModel(nn.Module):
         modalities,
         feature_dimensions,
         *args,
-        **kvargs
+        **kvargs,
     ):
         """
         Args:
             latent_size(int): size of models latent space
             modalities: list of modalities to be used
             feature_dimensions(dict): dictionary mapping modalities names to
-                modalities embedding size. 
+                modalities embedding size.
         """
         super(VAEModel, self).__init__()
         self.modalities = modalities
@@ -49,7 +48,7 @@ class VAEModel(nn.Module):
                         self.hidden_size_encoder[modality],
                         self.latent_size,
                         *args,
-                        **kvargs
+                        **kvargs,
                     )
                 }
             )

@@ -1,9 +1,9 @@
-from os import PathLike
-from typing import Text, Union
-
 import numpy as np
 import torch
+
+from os import PathLike
 from PIL.Image import Image
+from typing import Text, Union
 
 """
     This file contains type definitions and aliases

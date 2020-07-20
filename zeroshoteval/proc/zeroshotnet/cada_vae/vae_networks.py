@@ -2,7 +2,7 @@
 
 # region IMPORTS
 import torch
-import torch.nn as nn
+from torch import nn as nn
 
 # endregion
 

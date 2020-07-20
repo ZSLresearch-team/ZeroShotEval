@@ -1,51 +1,40 @@
-import itertools
-
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from torch.utils.data.sampler import SequentialSampler, SubsetRandomSampler
+from torch.utils.data.sampler import SubsetRandomSampler
 from tqdm import tqdm, trange
+
+import itertools
 
 from ..build import ZSL_MODEL_REGISTRY
 from .cada_vae_model import VAEModel
 
 
 def train_VAE(
-    config,
-    model,
-    train_loader,
-    optimizer,
-    use_ca_loss=True,
-    use_da_loss=True,
-    verbose=1,
-    *args,
-    **kwargs,
+    cfg, model, train_loader, optimizer, *args, **kwargs,
 ):
     r"""
     Train VAE model.
 
     Args:
-        config(dict): dict with different model, dataset and train parameters.
-        model: model to train.
-        datrain_loader: trainloader - loads train data.
+        cfg(CfgNode): configs. Details can be found in
+            zeroshoteval/config/defaults.py
+        model(nn.Module): model to train.
+        train_loader: trainloader - loads train data.
         optimizer: optimizer to be used.
-        use_ca_loss: if ``True`` will add cross allignment loss
-        use_da_loss: if ``True`` will add distance allignment loss
-        verbose: boolean or Int. The higher value verbose is - the more
-            info you get.
 
     Returns:
-        loss_history(list): loss history for 
+        loss_history(list): CADA-VAE traing loss history.
     """
-    if config.verbose > 1:
+    if cfg.VERBOSE > 1:
         print("\nTrain CADA-VAE model")
 
     tqdm_epoch = trange(
-        config.nepoch,
+        cfg.ZSL.EPOCH,
         desc="Loss: None. Epoch",
         unit="epoch",
-        disable=(verbose <= 0),
+        disable=(cfg.VERBOSE <= 0),
         leave=True,
     )
 
@@ -57,20 +46,20 @@ def train_VAE(
         loss_accum = 0
 
         beta, cross_reconstruction_factor, distance_factor = loss_factors(
-            epoch, config.specific_parameters.warmup
+            epoch, cfg.CADA_VAE.WARMUP
         )
         tqdm_train_loader = tqdm(
             train_loader,
             desc="Loss: None. Batch",
             unit="batch",
-            disable=(verbose <= 1),
+            disable=(cfg.VERBOSE <= 1),
             leave=False,
         )
 
         for i_step, (x, _) in enumerate(tqdm_train_loader):
 
             for modality, modality_tensor in x.items():
-                x[modality] = modality_tensor.to(config.device).float()
+                x[modality] = modality_tensor.to(cfg.DEVICE).float()
 
             x_recon, z_mu, z_logvar, z_noize = model(x)
 
@@ -88,9 +77,9 @@ def train_VAE(
 
             loss = loss_vae
 
-            if use_ca_loss:
+            if cfg.CADA_VAE.CROSS_RECONSTRUCTION:
                 loss += loss_ca * cross_reconstruction_factor
-            if use_da_loss and (distance_factor > 0):
+            if cfg.CADA_VAE.DISTRIBUTION_ALLIGNMENT and (distance_factor > 0):
                 loss += loss_da * distance_factor
 
             optimizer.zero_grad()
@@ -136,7 +125,7 @@ def eval_VAE(
 
         for _i_step, (x, _y) in enumerate(test_loader):
 
-            if test_modality == "img":
+            if test_modality == "IMG":
                 x = x[test_modality].float().to(device)
             else:
                 x = x.float().to(device)
@@ -326,56 +315,56 @@ def loss_factors(current_epoch, warmup):
         beta, cross_reconstruction_factor, distance_factor
     """
     # Beta factor
-    if current_epoch < warmup.beta.start_epoch:
+    if current_epoch < warmup.BETA.START_EPOCH:
         beta = 0
-    elif current_epoch >= warmup.beta.end_epoch:
-        beta = warmup.beta.factor
+    elif current_epoch >= warmup.BETA.END_EPOCH:
+        beta = warmup.BETA.FACTOR
     else:
         beta = (
             1.0
-            * (current_epoch - warmup.beta.start_epoch)
-            / (warmup.beta.end_epoch - warmup.beta.start_epoch)
-            * warmup.beta.factor
+            * (current_epoch - warmup.BETA.START_EPOCH)
+            / (warmup.BETA.END_EPOCH - warmup.BETA.START_EPOCH)
+            * warmup.BETA.FACTOR
         )
 
     # Cross-reconstruction factor
-    if current_epoch < warmup.cross_reconstruction.start_epoch:
+    if current_epoch < warmup.CROSS_RECONSTRUCTION.START_EPOCH:
         cross_reconstruction_factor = 0
-    elif current_epoch >= warmup.cross_reconstruction.end_epoch:
-        cross_reconstruction_factor = warmup.cross_reconstruction.factor
+    elif current_epoch >= warmup.CROSS_RECONSTRUCTION.END_EPOCH:
+        cross_reconstruction_factor = warmup.CROSS_RECONSTRUCTION.FACTOR
     else:
         cross_reconstruction_factor = (
             1.0
-            * (current_epoch - warmup.cross_reconstruction.start_epoch)
+            * (current_epoch - warmup.CROSS_RECONSTRUCTION.START_EPOCH)
             / (
-                warmup.cross_reconstruction.end_epoch
-                - warmup.cross_reconstruction.start_epoch
+                warmup.CROSS_RECONSTRUCTION.END_EPOCH
+                - warmup.CROSS_RECONSTRUCTION.START_EPOCH
             )
-            * warmup.cross_reconstruction.factor
+            * warmup.CROSS_RECONSTRUCTION.FACTOR
         )
 
     # Distribution alignment factor
-    if current_epoch < warmup.distance.start_epoch:
+    if current_epoch < warmup.DISTANCE.START_EPOCH:
         distance_factor = 0
-    elif current_epoch >= warmup.distance.end_epoch:
-        distance_factor = warmup.distance.factor
+    elif current_epoch >= warmup.DISTANCE.END_EPOCH:
+        distance_factor = warmup.DISTANCE.FACTOR
     else:
         distance_factor = (
             1.0
-            * (current_epoch - warmup.distance.start_epoch)
-            / (warmup.distance.end_epoch - warmup.distance.start_epoch)
-            * warmup.distance.factor
+            * (current_epoch - warmup.DISTANCE.START_EPOCH)
+            / (warmup.DISTANCE.END_EPOCH - warmup.DISTANCE.START_EPOCH)
+            * warmup.DISTANCE.FACTOR
         )
 
     return beta, cross_reconstruction_factor, distance_factor
 
 
-def generate_synthetic_dataset(model_config, dataset, model):
+def generate_synthetic_dataset(cfg, dataset, model):
     r"""
     Generates synthetic dataset via trained zsl model to cls training
 
     Args:
-        model_config(dict): dictionary with setting for model.
+        cfg(dict): dictionary with setting for model.
         dataset: original dataset.
         model: pretrained CADA-VAE model.
 
@@ -388,22 +377,20 @@ def generate_synthetic_dataset(model_config, dataset, model):
         zsl_emb_object_indice,
         zsl_emb_class,
         zsl_emb_class_label,
-    ) = dataset.get_zsl_emb_indice(
-        model_config.specific_parameters.samples_per_modality_class
-    )
+    ) = dataset.get_zsl_emb_indice(cfg.ZSL.SAMPLES_PER_CLASS)
 
     # Set CADA-Vae model to evaluate mode
     model.eval()
 
     # Generate zsl embeddings for train seen images
-    if model_config.generalized:
+    if cfg.GENERALIZED:
         sampler = SubsetRandomSampler(zsl_emb_object_indice)
         loader = DataLoader(
-            dataset, batch_size=model_config.batch_size, sampler=sampler
+            dataset, batch_size=cfg.ZSL.BATCH_SIZE, sampler=sampler
         )
 
         zsl_emb_img, zsl_emb_labels_img = eval_VAE(
-            model, loader, "img", model_config.device
+            model, loader, "IMG", cfg.DEVICE
         )
     else:
         zsl_emb_img = torch.FloatTensor()
@@ -414,41 +401,35 @@ def generate_synthetic_dataset(model_config, dataset, model):
     zsl_emb_class_label = torch.from_numpy(zsl_emb_class_label)
     zsl_emb_dataset = TensorDataset(zsl_emb_class, zsl_emb_class_label)
 
-    loader = DataLoader(zsl_emb_dataset, batch_size=model_config.batch_size)
+    loader = DataLoader(zsl_emb_dataset, batch_size=cfg.ZSL.BATCH_SIZE)
 
     zsl_emb_cls_attr, labels_cls_attr = eval_VAE(
-        model, loader, "cls_attr", model_config.device
+        model, loader, "CLS_ATTR", cfg.DEVICE
     )
-    if not model_config.generalized:
+    if not cfg.GENERALIZED:
         labels_cls_attr = remap_labels(
             labels_cls_attr.cpu().numpy(), dataset.unseen_classes
         )
         labels_cls_attr = torch.from_numpy(labels_cls_attr)
 
     # Generate zsl embeddings for test data
-    if model_config.generalized:
+    if cfg.GENERALIZED:
         sampler = SubsetRandomSampler(dataset.test_indices)
     else:
         sampler = SubsetRandomSampler(dataset.test_unseen_indices)
 
-    loader = DataLoader(
-        dataset, batch_size=model_config.batch_size, sampler=sampler
-    )
+    loader = DataLoader(dataset, batch_size=cfg.ZSL.BATCH_SIZE, sampler=sampler)
 
     zsl_emb_test, zsl_emb_labels_test = eval_VAE(
-        model,
-        loader,
-        "img",
-        model_config.device,
-        reparametrize_with_noise=False,
+        model, loader, "IMG", cfg.DEVICE, reparametrize_with_noise=False,
     )
 
     # Create zsl embeddings dataset
     zsl_emb = torch.cat((zsl_emb_img, zsl_emb_cls_attr, zsl_emb_test), 0)
 
-    zsl_emb_labels_img = zsl_emb_labels_img.long().to(model_config.device)
-    labels_cls_attr = labels_cls_attr.long().to(model_config.device)
-    zsl_emb_labels_test = zsl_emb_labels_test.long().to(model_config.device)
+    zsl_emb_labels_img = zsl_emb_labels_img.long().to(cfg.DEVICE)
+    labels_cls_attr = labels_cls_attr.long().to(cfg.DEVICE)
+    zsl_emb_labels_test = zsl_emb_labels_test.long().to(cfg.DEVICE)
 
     labels_tensor = torch.cat(
         (zsl_emb_labels_img, labels_cls_attr, zsl_emb_labels_test), 0
@@ -481,23 +462,20 @@ def remap_labels(labels, classes):
 
 
 @ZSL_MODEL_REGISTRY.register()
-def VAE_train_procedure(
-    model_config,
-    dataset,
-    gen_syn_data=True,
-    save_model=False,
-    save_dir="../../../model/",
+def CADA_VAE_train_procedure(
+    cfg, dataset, gen_syn_data=True, save_model=False, save_dir="checkpoints",
 ):
     """
     Starts CADA-VAE model training and generates zsl_embedding dataset for
     classifier training.
 
     Args:
-        model_config(dict): dictionary with setting for model.
-        dataset: dataset for training and evaluating.
+        cfg(CfgNode): configs. Details can be found in
+            zeroshoteval/config/defaults.py
+        dataset(Dataset): dataset for training and evaluating.
         gen_sen_data(bool): if ``True`` generates synthetic data for classifier
             after training.
-        save_model(bool):  if ``True`` saves model. 
+        save_model(bool):  if ``True`` saves model.
         save_dir(str): root to models save dir.
 
     Returns:
@@ -505,45 +483,45 @@ def VAE_train_procedure(
 
     """
     model = VAEModel(
-        hidden_size_encoder=model_config.specific_parameters.hidden_size_encoder,
-        hidden_size_decoder=model_config.specific_parameters.hidden_size_decoder,
-        latent_size=model_config.specific_parameters.latent_size,
+        hidden_size_encoder=cfg.CADA_VAE.HIDDEN_SIZE.ENCODER,
+        hidden_size_decoder=cfg.CADA_VAE.HIDDEN_SIZE.DECODER,
+        latent_size=cfg.CADA_VAE.LATENT_SIZE,
         modalities=dataset.modalities,
-        feature_dimensions=model_config.dataset.feature_dimensions,
-        use_bn=model_config.specific_parameters.use_bn,
-        use_dropout=model_config.specific_parameters.use_dropout,
+        feature_dimensions=cfg.DATA.FEAT_EMB.DIM,
+        use_bn=cfg.CADA_VAE.USE_BN,
+        use_dropout=False,
     )
 
-    if model_config.verbose > 2:
+    if cfg.VERBOSE > 2:
         print(model)
-    model.to(model_config.device)
+    model.to(cfg.DEVICE)
+
     # Model training
     optimizer = torch.optim.Adam(
         model.parameters(),
-        lr=model_config.specific_parameters.lr_gen_model,
-        betas=(0.9, 0.999),
+        lr=cfg.ZSL.SOLVER.BASE_LR,
+        betas=cfg.ZSL.SOLVER.BETAS,
         eps=1e-08,
-        weight_decay=0,
-        amsgrad=True,
+        weight_decay=cfg.ZSL.SOLVER.WEIGHT_DECAY,
+        amsgrad=cfg.ZSL.SOLVER.AMSGRAD,
     )
 
     train_sampler = SubsetRandomSampler(dataset.train_indices)
     train_loader = DataLoader(
         dataset,
-        batch_size=model_config.batch_size,
+        batch_size=cfg.ZSL.BATCH_SIZE,
         sampler=train_sampler,
-        drop_last=True,
+        drop_last=cfg.DATA_LOADER.DROP_LAST,
+        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
+        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
     )
 
     loss_history = train_VAE(
-        config=model_config,
+        cfg=cfg,
         model=model,
         train_loader=train_loader,
         optimizer=optimizer,
-        recon_loss_norm=model_config.specific_parameters.loss,
-        use_ca_loss=model_config.cross_resonstuction,
-        use_da_loss=model_config.distibution_allignment,
-        verbose=model_config.verbose,
+        recon_loss_norm=cfg.CADA_VAE.NORM_TYPE,
     )
     if save_model:
         # TODO: implement model saving
@@ -551,6 +529,6 @@ def VAE_train_procedure(
 
     if gen_syn_data:
 
-        return generate_synthetic_dataset(model_config, dataset, model)
+        return generate_synthetic_dataset(cfg, dataset, model)
 
     return model

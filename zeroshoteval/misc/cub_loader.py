@@ -13,13 +13,12 @@ creates a pandas.DataFrame 'splits_df' with image name and 4 columns
 NOTE: the script should recieve at the input names of modalities to load
 e.g. modalities=['images', 'attributes']
 """
+import numpy as np
+import pandas as pd
 
 import os
 import shutil
 import tarfile
-
-import numpy as np
-import pandas as pd
 from PIL import Image, ImageDraw
 
 

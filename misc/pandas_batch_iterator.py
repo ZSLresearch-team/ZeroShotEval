@@ -1,6 +1,6 @@
-from math import ceil
-
 import pandas as pd
+
+from math import ceil
 
 
 class PandasBatchIterator:

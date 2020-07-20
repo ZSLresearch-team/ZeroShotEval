@@ -2,8 +2,8 @@
 """
 import numpy as np
 import torch
-import torch.nn as nn
 from sklearn.metrics import confusion_matrix
+from torch import nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from tqdm import tqdm, trange
@@ -31,7 +31,7 @@ def weights_init(m):
 
     To do:
         -Try another gain(1.41 )
-        -Try 
+        -Try
     """
     classname = m.__class__.__name__
     if classname.find("Linear") != -1:
@@ -95,7 +95,7 @@ def train_cls(
         leave=True,
     )
 
-    for epoch in tqdm_epoch:
+    for _epoch in tqdm_epoch:
         classifier.train()
         tqdm_train_loader = tqdm(
             train_loader,
@@ -136,7 +136,8 @@ def train_cls(
         acc_H_hist.append(acc_H)
 
         tqdm_epoch.set_description(
-            f"Loss: {loss_accum_mean:.1f} Seen: {acc_seen:.2f}. Unseen: {acc_unseen:.2f}. H: {acc_H:.2f}"
+            f"Loss: {loss_accum_mean:.1f} Seen: {acc_seen:.2f}. "
+            f"Unseen: {acc_unseen:.2f}. H: {acc_H:.2f}"
         )
         tqdm_epoch.refresh()
 
@@ -197,37 +198,29 @@ def compute_mean_per_class_accuracies(
 
 
 def classification_procedure(
+    cfg,
     data,
     in_features,
     num_classes,
-    batch_size,
-    device,
-    n_epoch,
-    lr,
     train_indicies,
     test_indicies,
     seen_classes,
     unseen_classes,
-    verbose,
 ):
     """
     Launches classifier training.
 
     Args:
-        data: torch dataset
+        cfg(CfgNode):configs. Details can be found in
+            zeroshoteval/config/defaults.py
+        data(Dataset): torch tensor dataset for ZSL embeddings.
         in_features(int): number of input features.
         num_classes(int): number of classes.
-        batch_size(Int): batch size for classifier training.
-        device(str): model device.
-        n_epoch(int): number of epochs to train.
-        lr(float): learning rate.
         train_indicies: indicies of training data.
         test_indices: inicies of testing data.
         seen_classes(numpy array): labels of seen classes.
         unseen_classes(numpy array): labels of unseen classes.
-        verbose: boolean or Int. The higher value verbose is - the more info
-            you get.
-    
+
     Returns:
         loss_hist(list): train loss history.
         acc_seen_hist(list): accuracy for seen classes.
@@ -240,28 +233,35 @@ def classification_procedure(
     test_sampler = SubsetRandomSampler(test_indicies)
 
     train_loader = DataLoader(
-        data, batch_size=batch_size, sampler=train_sampler
+        data, batch_size=cfg.CLS.BATCH_SIZE, sampler=train_sampler
     )
-    test_loader = DataLoader(data, batch_size=batch_size, sampler=test_sampler)
+    test_loader = DataLoader(
+        data, batch_size=cfg.CLS.BATCH_SIZE, sampler=test_sampler
+    )
 
     optimizer = torch.optim.Adam(
-        classifier.parameters(), lr=lr, betas=(0.9, 0.999)
+        classifier.parameters(),
+        lr=cfg.CLS.SOLVER.BASE_LR,
+        betas=cfg.CLS.SOLVER.BETAS,
+        eps=1e-08,
+        weight_decay=cfg.CLS.SOLVER.WEIGHT_DECAY,
+        amsgrad=cfg.CLS.SOLVER.AMSGRAD,
     )
 
     train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist = train_cls(
         classifier,
         optimizer,
-        device,
-        n_epoch,
+        cfg.DEVICE,
+        cfg.CLS.EPOCH,
         num_classes,
         seen_classes,
         unseen_classes,
         train_loader,
         test_loader,
-        verbose=verbose,
+        verbose=cfg.VERBOSE,
     )
 
-    if verbose > 0:
+    if cfg.VERBOSE > 0:
         best_H_idx = acc_H_hist.index(max(acc_H_hist))
         print(
             f"Best accuracy H: {acc_H_hist[best_H_idx]:.4f}, "

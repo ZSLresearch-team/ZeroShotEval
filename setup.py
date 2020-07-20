@@ -20,6 +20,7 @@ setup(
         "tensorboard",
         "pandas",
     ],
+    python_requires=">=3.7",
     extras_require={
         "dev": [
             "flake8==3.8.3",

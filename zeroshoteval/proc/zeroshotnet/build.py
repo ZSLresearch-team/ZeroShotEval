@@ -12,4 +12,4 @@ def build_zsl(zsmodel_name):
     """
     """
 
-    return ZSL_MODEL_REGISTRY.get(zsmodel_name)
+    return ZSL_MODEL_REGISTRY.get(f"{zsmodel_name}_train_procedure")
