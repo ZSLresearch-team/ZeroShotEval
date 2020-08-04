@@ -5,25 +5,23 @@
 import numpy as np
 import torch
 
+from zeroshoteval.utils.defaults import default_setup
 from zeroshoteval.utils.parser import load_config, parse_args
 
 from single_experiment import experiment
 
 
-def main():
-    args = parse_args()
+def setup(args):
     cfg = load_config(args)
     cfg.freeze()
+    default_setup(cfg, args)
 
-    # Set random generator seed if need
-    if cfg.RNG_SEED > 0:
-        np.random.seed(cfg.RNG_SEED)
-        torch.manual_seed(cfg.RNG_SEED)
+    return cfg
 
-        # Set CuDNN to deterministic mode
-        if cfg.CUDNN_DETERMINISTIC:
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
+
+def main():
+    args = parse_args()
+    cfg = setup(args)
 
     experiment(cfg)
 

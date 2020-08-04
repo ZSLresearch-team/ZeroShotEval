@@ -4,6 +4,10 @@ from scipy import io as sio
 from sklearn import preprocessing
 from torch.utils.data import Dataset
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class ObjEmbeddingDataset(Dataset):
     """Object embeddings dataset"""
@@ -140,10 +144,9 @@ class ObjEmbeddingDataset(Dataset):
         Reading mat dataset form datadir
         """
         # Getting CNN features and labels
-        if verbose > 1:
-            print(
-                f"[INFO] Loading computed embeddings and splits from {self.datadir}..."
-            )
+        logger.info(
+            f"Loading computed embeddings and splits from {self.datadir}"
+        )
 
         cnn_features = sio.loadmat(self.datadir + "res101.mat")
         feature = cnn_features["features"].T
@@ -173,7 +176,6 @@ class ObjEmbeddingDataset(Dataset):
 
         self.data = data
 
-        if verbose > 1:
-            print("Done!")
+        logger.info("Embeddings succesfully loaded.")
 
         return None

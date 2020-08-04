@@ -2,9 +2,23 @@
 
 from setuptools import find_packages, setup
 
+
+def get_version():
+    init_py_path = path.join(
+        path.abspath(path.dirname(__file__)), "zeroshoteval", "__init__.py"
+    )
+    init_py = open(init_py_path, "r").readlines()
+    version_line = [l.strip() for l in init_py if l.startswith("__version__")][
+        0
+    ]
+    version = version_line.split("=")[-1].strip().strip("'\"")
+
+    return version
+
+
 setup(
     name="zeroshoteval",
-    version="0.1.0",
+    version=get_version(),
     author="ZSLresearch team",
     url="https://github.com/ZSLresearch-team/ZeroShotEval/",
     description="Python zero-shot learning toolkit",
@@ -19,8 +33,9 @@ setup(
         "easydict",
         "tensorboard",
         "pandas",
+        "simplejson",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.6",
     extras_require={
         "dev": [
             "flake8==3.8.3",

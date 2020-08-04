@@ -6,7 +6,12 @@ from sklearn.metrics import confusion_matrix
 from torch import nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
-from tqdm import tqdm, trange
+
+from zeroshoteval.utils.misc import RNG_seed_setup
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SoftmaxClassifier(nn.Module):
@@ -84,29 +89,13 @@ def train_cls(
     acc_unseen_hist = []
     acc_H_hist = []
 
-    if verbose >= 1:
-        print("\nTrain Classifier")
+    logger.info("Training Final classifier\n")
 
-    tqdm_epoch = trange(
-        n_epoch,
-        desc="Loss: None. Seen: None. Unseen: None. H",
-        unit="epoch",
-        disable=(verbose <= 0),
-        leave=True,
-    )
-
-    for _epoch in tqdm_epoch:
+    for _epoch in range(n_epoch):
         classifier.train()
-        tqdm_train_loader = tqdm(
-            train_loader,
-            desc="Loss: None. Batch",
-            unit="batch",
-            disable=(verbose <= 1),
-            leave=False,
-        )
         loss_accum = 0
 
-        for i_step, (x, y) in enumerate(tqdm_train_loader):
+        for i_step, (x, y) in enumerate(train_loader):
             x = x.to(device)
             y = y.to(device)
 
@@ -118,10 +107,6 @@ def train_cls(
             optimizer.step()
 
             loss_accum += loss.item()
-            tqdm_train_loader.set_description(
-                f"Loss: {loss_accum / (i_step + 1):.1f}. Batch"
-            )
-            tqdm_train_loader.refresh()
 
         loss_accum_mean = loss_accum / (i_step + 1)
         loss_hist.append(loss_accum_mean)
@@ -135,11 +120,11 @@ def train_cls(
         acc_unseen_hist.append(acc_unseen)
         acc_H_hist.append(acc_H)
 
-        tqdm_epoch.set_description(
-            f"Loss: {loss_accum_mean:.1f} Seen: {acc_seen:.2f}. "
-            f"Unseen: {acc_unseen:.2f}. H: {acc_H:.2f}"
+        logger.info(
+            f"Epoch: {_epoch+1} "
+            f"Loss: {loss_accum_mean:.1f} Seen: {acc_seen:.2f} "
+            f"Unseen: {acc_unseen:.2f} H: {acc_H:.2f}"
         )
-        tqdm_epoch.refresh()
 
     return loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist
 
@@ -211,7 +196,7 @@ def classification_procedure(
     Launches classifier training.
 
     Args:
-        cfg(CfgNode):configs. Details can be found in
+        cfg(CfgNode): configs. Details can be found in
             zeroshoteval/config/defaults.py
         data(Dataset): torch tensor dataset for ZSL embeddings.
         in_features(int): number of input features.
@@ -227,6 +212,8 @@ def classification_procedure(
         acc_unseen_hist(list): accuracy for unseen classes.
         acc_H_hist(list): harmonic mean of seen and unseen accuracies.
     """
+
+    RNG_seed_setup(None if (cfg.RNG_SEED < 0) else RNG_SEED)
     classifier = SoftmaxClassifier(in_features, num_classes)
 
     train_sampler = SubsetRandomSampler(train_indicies)
@@ -261,12 +248,13 @@ def classification_procedure(
         verbose=cfg.VERBOSE,
     )
 
-    if cfg.VERBOSE > 0:
-        best_H_idx = acc_H_hist.index(max(acc_H_hist))
-        print(
-            f"Best accuracy H: {acc_H_hist[best_H_idx]:.4f}, "
-            f"Seen: {acc_seen_hist[best_H_idx]:.4f}, "
-            f"Unseen: {acc_unseen_hist[best_H_idx]:.4f}"
-        )
+    best_H_idx = acc_H_hist.index(max(acc_H_hist))
+
+    logger.info(
+        "Results:\n"
+        f"Best accuracy H: {acc_H_hist[best_H_idx]:.4f}, "
+        f"Seen: {acc_seen_hist[best_H_idx]:.4f}, "
+        f"Unseen: {acc_unseen_hist[best_H_idx]:.4f}"
+    )
 
     return train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist

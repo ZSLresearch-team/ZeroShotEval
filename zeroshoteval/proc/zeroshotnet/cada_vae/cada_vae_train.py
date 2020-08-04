@@ -6,9 +6,12 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from tqdm import tqdm, trange
 
 import itertools
+import logging
 
 from ..build import ZSL_MODEL_REGISTRY
 from .cada_vae_model import VAEModel
+
+logger = logging.getLogger(__name__)
 
 
 def train_VAE(
@@ -27,36 +30,20 @@ def train_VAE(
     Returns:
         loss_history(list): CADA-VAE traing loss history.
     """
-    if cfg.VERBOSE > 1:
-        print("\nTrain CADA-VAE model")
-
-    tqdm_epoch = trange(
-        cfg.ZSL.EPOCH,
-        desc="Loss: None. Epoch",
-        unit="epoch",
-        disable=(cfg.VERBOSE <= 0),
-        leave=True,
-    )
+    logger.info("Train CADA-VAE model")
 
     loss_history = []
     model.train()
 
-    for epoch in tqdm_epoch:
+    for epoch in range(cfg.ZSL.EPOCH):
 
         loss_accum = 0
 
         beta, cross_reconstruction_factor, distance_factor = loss_factors(
             epoch, cfg.CADA_VAE.WARMUP
         )
-        tqdm_train_loader = tqdm(
-            train_loader,
-            desc="Loss: None. Batch",
-            unit="batch",
-            disable=(cfg.VERBOSE <= 1),
-            leave=False,
-        )
 
-        for i_step, (x, _) in enumerate(tqdm_train_loader):
+        for _i_step, (x, _) in enumerate(train_loader):
 
             for modality, modality_tensor in x.items():
                 x[modality] = modality_tensor.to(cfg.DEVICE).float()
@@ -87,15 +74,10 @@ def train_VAE(
             optimizer.step()
 
             loss_accum += loss.item()
-            tqdm_train_loader.set_description(
-                f"Loss: {loss_accum / (i_step + 1):.1f}. Batch"
-            )
-            tqdm_train_loader.refresh()
 
-        loss_accum_mean = loss_accum / (i_step + 1)
+        loss_accum_mean = loss_accum / (_i_step + 1)
 
-        tqdm_epoch.set_description(f"Loss: {loss_accum_mean:.1f}. Epoch")
-        tqdm_epoch.refresh()
+        logger.info(f"Epoch: {epoch+1} " f"Loss: {loss_accum_mean:.1f}")
 
         loss_history.append(loss_accum_mean)
 
@@ -373,6 +355,7 @@ def generate_synthetic_dataset(cfg, dataset, model):
         csl_train_indice: train indicies.
         csl_test_indice: test indicies.
     """
+    logger.info("ZSL embedding generation")
     (
         zsl_emb_object_indice,
         zsl_emb_class,
@@ -492,8 +475,7 @@ def CADA_VAE_train_procedure(
         use_dropout=False,
     )
 
-    if cfg.VERBOSE > 2:
-        print(model)
+    logger.info(f"ZSL model name: {cfg.ZSL_MODEL_NAME}" f"ZSL model:\n{model}")
     model.to(cfg.DEVICE)
 
     # Model training
