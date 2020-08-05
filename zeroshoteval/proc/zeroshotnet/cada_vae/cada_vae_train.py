@@ -3,10 +3,11 @@ import torch
 from torch import nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data.sampler import SubsetRandomSampler
-from tqdm import tqdm, trange
+import logging
 
 import itertools
 import logging
+from zeroshoteval.utils.misc import log_model_info
 
 from ..build import ZSL_MODEL_REGISTRY
 from .cada_vae_model import VAEModel
@@ -475,8 +476,8 @@ def CADA_VAE_train_procedure(
         use_dropout=False,
     )
 
-    logger.info(f"ZSL model name: {cfg.ZSL_MODEL_NAME}" f"ZSL model:\n{model}")
     model.to(cfg.DEVICE)
+    log_model_info(model, cfg.ZSL_MODEL_NAME)
 
     # Model training
     optimizer = torch.optim.Adam(

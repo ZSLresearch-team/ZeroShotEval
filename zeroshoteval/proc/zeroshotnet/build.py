@@ -19,6 +19,6 @@ def build_zsl(cfg):
         cfg(CfgNode):configs. Details can be found in
             zeroshoteval/config/defaults.py
     """
-    RNG_seed_setup(None if (cfg.RNG_SEED < 0) else RNG_SEED)
+    RNG_seed_setup(cfg)
 
     return ZSL_MODEL_REGISTRY.get(f"{cfg.ZSL_MODEL_NAME}_train_procedure")

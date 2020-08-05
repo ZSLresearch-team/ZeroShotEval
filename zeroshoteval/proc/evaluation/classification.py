@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from zeroshoteval.utils.misc import RNG_seed_setup
+from zeroshoteval.utils.misc import log_model_info
 
 import logging
 
@@ -136,7 +137,7 @@ def compute_mean_per_class_accuracies(
     Computes mean per-class accuracies for both seen and unseen classes.
 
     Args:
-        classifier: classifaer model to eval.
+        classifier: classifier model to eval.
         loader(Dataloader): data loader.
         seen_classes(numpy array): labels of seen classes.
         unseen_classes(numpy array): labels of unseen classes.
@@ -213,8 +214,10 @@ def classification_procedure(
         acc_H_hist(list): harmonic mean of seen and unseen accuracies.
     """
 
-    RNG_seed_setup(None if (cfg.RNG_SEED < 0) else RNG_SEED)
+    RNG_seed_setup(cfg)
     classifier = SoftmaxClassifier(in_features, num_classes)
+    classifier.to(cfg.DEVICE)
+    log_model_info(classifier, "Final Classifier")
 
     train_sampler = SubsetRandomSampler(train_indicies)
     test_sampler = SubsetRandomSampler(test_indicies)
