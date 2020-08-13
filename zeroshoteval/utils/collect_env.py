@@ -1,11 +1,8 @@
 import numpy as np
 import torch
 
-import importlib
 import os
 import PIL
-import re
-import subprocess
 import sys
 from collections import defaultdict
 from tabulate import tabulate

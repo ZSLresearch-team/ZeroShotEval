@@ -3,11 +3,12 @@ import torch
 from torch import nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data.sampler import SubsetRandomSampler
-import logging
+
+from zeroshoteval.utils.misc import log_model_info
+from zeroshoteval.utils.optimizer_helper import build_optimizer
 
 import itertools
 import logging
-from zeroshoteval.utils.misc import log_model_info
 
 from ..build import ZSL_MODEL_REGISTRY
 from .cada_vae_model import VAEModel
@@ -25,20 +26,27 @@ def train_VAE(
         cfg(CfgNode): configs. Details can be found in
             zeroshoteval/config/defaults.py
         model(nn.Module): model to train.
-        train_loader: trainloader - loads train data.
-        optimizer: optimizer to be used.
+        train_loader: trainloader - loads train data
+        optimizer: optimizer to be used
 
     Returns:
-        loss_history(list): CADA-VAE traing loss history.
+        loss_history(list): CADA-VAE traing loss history
     """
     logger.info("Train CADA-VAE model")
 
     loss_history = []
+    loss_vae = []
+    loss_ca = []
+    loss_da = []
+
     model.train()
 
     for epoch in range(cfg.ZSL.EPOCH):
 
         loss_accum = 0
+        loss_vae_accum = 0
+        loss_ca_accum = 0
+        loss_da_accum = 0
 
         beta, cross_reconstruction_factor, distance_factor = loss_factors(
             epoch, cfg.CADA_VAE.WARMUP
@@ -64,6 +72,9 @@ def train_VAE(
             )
 
             loss = loss_vae
+            loss_vae_accum += loss_vae.item()
+            loss_ca_accum += loss_ca.item() * cross_reconstruction_factor
+            loss_da_accum += loss_da.item() * distance_factor
 
             if cfg.CADA_VAE.CROSS_RECONSTRUCTION:
                 loss += loss_ca * cross_reconstruction_factor
@@ -77,8 +88,14 @@ def train_VAE(
             loss_accum += loss.item()
 
         loss_accum_mean = loss_accum / (_i_step + 1)
-
-        logger.info(f"Epoch: {epoch+1} " f"Loss: {loss_accum_mean:.1f}")
+        loss_vae_accum = loss_vae_accum / (_i_step + 1)
+        loss_ca_accum = loss_ca_accum / (_i_step + 1)
+        loss_da_accum = loss_da_accum / (_i_step + 1)
+        logger.info(
+            f"Epoch: {epoch+1} "
+            f"Loss: {loss_accum_mean:.1f} "
+            f"Loss vae: {loss_vae_accum}, loss ca: {loss_ca_accum} loss da: {loss_da_accum}"
+        )
 
         loss_history.append(loss_accum_mean)
 
@@ -466,6 +483,7 @@ def CADA_VAE_train_procedure(
         model: trained model.
 
     """
+    logger.info("Building CADA-VAE model")
     model = VAEModel(
         hidden_size_encoder=cfg.CADA_VAE.HIDDEN_SIZE.ENCODER,
         hidden_size_decoder=cfg.CADA_VAE.HIDDEN_SIZE.DECODER,
@@ -480,14 +498,7 @@ def CADA_VAE_train_procedure(
     log_model_info(model, cfg.ZSL_MODEL_NAME)
 
     # Model training
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=cfg.ZSL.SOLVER.BASE_LR,
-        betas=cfg.ZSL.SOLVER.BETAS,
-        eps=1e-08,
-        weight_decay=cfg.ZSL.SOLVER.WEIGHT_DECAY,
-        amsgrad=cfg.ZSL.SOLVER.AMSGRAD,
-    )
+    optimizer = build_optimizer(model, cfg, "ZSL")
 
     train_sampler = SubsetRandomSampler(dataset.train_indices)
     train_loader = DataLoader(

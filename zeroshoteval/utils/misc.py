@@ -1,11 +1,11 @@
 import numpy as np
-import torch
-import logging
-import os
 import psutil
+import torch
 from fvcore.nn.activation_count import activation_count
 from fvcore.nn.flop_count import flop_count
 
+import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +93,8 @@ def get_model_stats(model, mode):
         model_stats_fun = flop_count
     elif mode == "activation":
         model_stats_fun = activation_count
-    
+
     pass
-    
 
 
 def log_model_info(model, model_name):

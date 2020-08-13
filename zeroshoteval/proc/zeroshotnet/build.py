@@ -15,8 +15,8 @@ def build_zsl(cfg):
     Builds zero shot learning model training and evaluating.
     Also setting RNG seed.
 
-    Args: 
-        cfg(CfgNode):configs. Details can be found in
+    Args:
+        cfg(CfgNode): configs. Details can be found in
             zeroshoteval/config/defaults.py
     """
     RNG_seed_setup(cfg)

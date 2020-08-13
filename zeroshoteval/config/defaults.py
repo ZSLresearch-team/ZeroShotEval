@@ -154,7 +154,7 @@ _C.ZSL.SOLVER.AMSGRAD = False
 # L2 weight regularization
 _C.ZSL.SOLVER.WEIGHT_DECAY = 1e-4
 
-# Optimization method(only adam available for now)
+# Optimization method(only adam and sgd available for now)
 _C.ZSL.SOLVER.OPTIMIZING_METHOD = "adam"
 
 
@@ -202,7 +202,7 @@ _C.CLS.SOLVER.AMSGRAD = False
 # L2 weight regularization
 _C.CLS.SOLVER.WEIGHT_DECAY = 1e-4
 
-# Optimization method(only adam available for now)
+# Optimization method(only adam and sgd available for now)
 _C.CLS.SOLVER.OPTIMIZING_METHOD = "adam"
 
 
@@ -248,7 +248,7 @@ _C.DATA.FEAT_EMB.DIM.CLS_ATTR = 312
 _C.ZSL_MODEL_NAME = "CADA_VAE"
 
 # Output basedir.
-_C.OUTPUT_DIR = "./tmp"
+_C.OUTPUT_DIR = "."
 
 # Note that non-determinism may still be present due to non-deterministic
 # operator implementations in GPU operator libraries.
@@ -297,10 +297,10 @@ def _assert_and_infer_cfg(cfg):
     assert cfg.CADA_VAE.NORM_TYPE in ["l1", "l2"]
 
     # ZSL model assertions
-    assert cfg.ZSL.SOLVER.OPTIMIZING_METHOD in ["adam"]
+    assert cfg.ZSL.SOLVER.OPTIMIZING_METHOD in ["adam", "sgd"]
 
     # Final classifier assertions
-    assert cfg.CLS.SOLVER.OPTIMIZING_METHOD in ["adam"]
+    assert cfg.CLS.SOLVER.OPTIMIZING_METHOD in ["adam", "sgd"]
 
     return cfg
 

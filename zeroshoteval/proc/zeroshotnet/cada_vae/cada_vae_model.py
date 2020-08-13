@@ -1,11 +1,6 @@
-"""
-"""
-# region IMPORTS
 from torch import nn as nn
 
 from .vae_networks import DecoderTemplate, EncoderTemplate
-
-# endregion
 
 
 class VAEModel(nn.Module):

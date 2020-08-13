@@ -7,8 +7,8 @@ from torch import nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from zeroshoteval.utils.misc import RNG_seed_setup
-from zeroshoteval.utils.misc import log_model_info
+from zeroshoteval.utils.misc import RNG_seed_setup, log_model_info
+from zeroshoteval.utils.optimizer_helper import build_optimizer
 
 import logging
 
@@ -96,7 +96,7 @@ def train_cls(
         classifier.train()
         loss_accum = 0
 
-        for i_step, (x, y) in enumerate(train_loader):
+        for _i_step, (x, y) in enumerate(train_loader):
             x = x.to(device)
             y = y.to(device)
 
@@ -109,7 +109,7 @@ def train_cls(
 
             loss_accum += loss.item()
 
-        loss_accum_mean = loss_accum / (i_step + 1)
+        loss_accum_mean = loss_accum / (_i_step + 1)
         loss_hist.append(loss_accum_mean)
 
         # Calculate accuracies
@@ -215,6 +215,7 @@ def classification_procedure(
     """
 
     RNG_seed_setup(cfg)
+    logger.info("Building final classifier model")
     classifier = SoftmaxClassifier(in_features, num_classes)
     classifier.to(cfg.DEVICE)
     log_model_info(classifier, "Final Classifier")
@@ -229,14 +230,7 @@ def classification_procedure(
         data, batch_size=cfg.CLS.BATCH_SIZE, sampler=test_sampler
     )
 
-    optimizer = torch.optim.Adam(
-        classifier.parameters(),
-        lr=cfg.CLS.SOLVER.BASE_LR,
-        betas=cfg.CLS.SOLVER.BETAS,
-        eps=1e-08,
-        weight_decay=cfg.CLS.SOLVER.WEIGHT_DECAY,
-        amsgrad=cfg.CLS.SOLVER.AMSGRAD,
-    )
+    optimizer = build_optimizer(classifier, cfg, "CLS")
 
     train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist = train_cls(
         classifier,

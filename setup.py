@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-
 from setuptools import find_packages, setup
+
+from os import path
 
 
 def get_version():
@@ -8,9 +9,9 @@ def get_version():
         path.abspath(path.dirname(__file__)), "zeroshoteval", "__init__.py"
     )
     init_py = open(init_py_path, "r").readlines()
-    version_line = [l.strip() for l in init_py if l.startswith("__version__")][
-        0
-    ]
+    version_line = [
+        line.strip() for line in init_py if line.startswith("__version__")
+    ][0]
     version = version_line.split("=")[-1].strip().strip("'\"")
 
     return version

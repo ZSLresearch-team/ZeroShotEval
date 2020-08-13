@@ -15,9 +15,9 @@ def experiment(cfg):
 
     data = ObjEmbeddingDataset(cfg.DATA.FEAT_EMB.PATH, ["IMG"], cfg.VERBOSE)
 
-    (zsl_emb_dataset, csl_train_indice, csl_test_indice,) = build_zsl(
-        cfg
-    )(cfg, data)
+    (zsl_emb_dataset, csl_train_indice, csl_test_indice,) = build_zsl(cfg)(
+        cfg, data
+    )
 
     # Train
     num_classes = (

@@ -1,10 +1,5 @@
 """Main script-launcher for training of ZSL models."""
 
-
-# region IMPORTS
-import numpy as np
-import torch
-
 from zeroshoteval.utils.defaults import default_setup
 from zeroshoteval.utils.parser import load_config, parse_args
 
