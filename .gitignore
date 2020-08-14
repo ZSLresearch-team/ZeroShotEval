@@ -110,3 +110,7 @@ venv.bak/
 # Local storages
 data/*
 models/*
+
+# Log files
+*.log
+*.txt
