@@ -64,6 +64,7 @@ class Classifier_train:
 
             loss_accum_mean = loss_accum / (i_step + 1)
             loss_hist.append(loss_accum_mean)
+        return loss_hist
 
 
     def get_loss(self, input_embeddings, input_label):
@@ -75,3 +76,5 @@ class Classifier_train:
     
     def save_trained_classifier(self, path_to_save):
         pass
+    
+    def load_trained_classifier(self, path_to_classifier)
