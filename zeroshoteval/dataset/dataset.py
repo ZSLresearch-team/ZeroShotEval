@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class ObjEmbeddingDataset(Dataset):
     """Object embeddings dataset"""
 
-    def __init__(self, datadir, object_modalities, verbose=1):
+    def __init__(self, datadir, object_modalities, split):
         """
         Args:
             data(dict): dict mapping modalities name to modalities object
@@ -25,13 +25,16 @@ class ObjEmbeddingDataset(Dataset):
         self.datadir = datadir
         self.data = None
         self.labels = None
+        
+        assert split in ["trainval", "test", "ce"]
+        self.split = split
 
         self.train_indices = None
         self.test_indices = None
         self.test_seen_indices = None
         self.test_unseen_indices = None
 
-        self.read_matdata(verbose)
+        self.read_matdata()
 
         self.seen_classes = np.unique(self.labels[self.train_indices])
         self.unseen_classes = np.unique(self.labels[self.test_unseen_indices])
@@ -139,36 +142,43 @@ class ObjEmbeddingDataset(Dataset):
 
         return indices_obj, usneen_classes_emb, usneen_classes_emb_labels
 
-    def read_matdata(self, verbose=1):
+    def read_matdata(self):
         """
         Reading mat dataset form datadir
         """
         # Getting CNN features and labels
         logger.info(
-            f"Loading computed embeddings and splits from {self.datadir}"
+            f"Loading computed embeddings from {self.datadir}... "
+            f"with {self.split} split"
         )
 
         cnn_features = sio.loadmat(self.datadir + "res101.mat")
         feature = cnn_features["features"].T
-        self.labels = cnn_features["labels"].astype(int).squeeze() - 1
+        labels = cnn_features["labels"].astype(int).squeeze() - 1
 
         # Getting data splits and class attributes
         att_splits = sio.loadmat(self.datadir + "att_splits.mat")
         # numpy array index starts from 0, matlab starts from 1
-        self.train_indices = (
-            att_splits["trainval_loc"].squeeze() - 1
-        )  # --> train_feature = TRAIN SEEN
-        self.test_seen_indices = att_splits["test_seen_loc"].squeeze() - 1
-        self.test_unseen_indices = att_splits["test_unseen_loc"].squeeze() - 1
-        self.test_indices = np.append(
-            self.test_seen_indices, self.test_unseen_indices
-        )
-
+        if self.split in ["trainval"]:
+            indices = (
+                att_splits["trainval_loc"].squeeze() - 1
+            )  # --> train_feature = TRAIN SEEN
+        elif self.split in ["test"]:
+            test_seen_indices = att_splits["test_seen_loc"].squeeze() - 1
+            test_unseen_indices = att_splits["test_unseen_loc"].squeeze() - 1
+            indices = np.append(
+                test_seen_indices, test_unseen_indices
+            )
+        
         class_attr = torch.from_numpy(att_splits["att"].T)
 
         scaler = preprocessing.MinMaxScaler()
-
-        feature = scaler.fit_transform(feature)
+        if self.split =="ce":
+            feature = scaler.fit_transform(feature)
+            self.labels = labels
+        else:
+            feature = scaler.fit_transform(feature[indices])
+            self.labels = labels[indices]
 
         data = {}
         data["IMG"] = feature

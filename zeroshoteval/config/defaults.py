@@ -270,9 +270,6 @@ _C.NUM_SHOTS = 0
 # If True GZSL mode, else ZSL
 _C.GENERALIZED = True
 
-# Verbosity option
-_C.VERBOSE = 2
-
 # Device to use dor training
 _C.DEVICE = "cuda:0"
 

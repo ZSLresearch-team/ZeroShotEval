@@ -1,3 +1,5 @@
+import itertools
+import logging
 import numpy as np
 import torch
 from torch import nn as nn
@@ -6,9 +8,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 from zeroshoteval.utils.misc import log_model_info
 from zeroshoteval.utils.optimizer_helper import build_optimizer
-
-import itertools
-import logging
+from zeroshoteval.dataset.loader import construct_loader
 
 from ..build import ZSL_MODEL_REGISTRY
 from .cada_vae_model import VAEModel
@@ -500,15 +500,7 @@ def CADA_VAE_train_procedure(
     # Model training
     optimizer = build_optimizer(model, cfg, "ZSL")
 
-    train_sampler = SubsetRandomSampler(dataset.train_indices)
-    train_loader = DataLoader(
-        dataset,
-        batch_size=cfg.ZSL.BATCH_SIZE,
-        sampler=train_sampler,
-        drop_last=cfg.DATA_LOADER.DROP_LAST,
-        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
-    )
+    train_loader = construct_loader(cfg, "trainval")
 
     loss_history = train_VAE(
         cfg=cfg,
