@@ -1,9 +1,8 @@
+import os
 from fvcore.common.file_io import PathManager
 
 from zeroshoteval.utils.collect_env import collect_env_info
 from zeroshoteval.utils.logger import setup_logger
-
-import os
 
 
 def default_setup(cfg, args):

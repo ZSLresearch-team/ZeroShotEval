@@ -9,6 +9,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from zeroshoteval.utils.misc import log_model_info
 from zeroshoteval.utils.optimizer_helper import build_optimizer
 from zeroshoteval.dataset.loader import construct_loader
+from zeroshoteval.dataset.dataset import GenEmbeddingDataset
 
 from ..build import ZSL_MODEL_REGISTRY
 from .cada_vae_model import VAEModel
@@ -126,7 +127,7 @@ def eval_VAE(
         for _i_step, (x, _y) in enumerate(test_loader):
 
             if test_modality == "IMG":
-                x = x[test_modality].float().to(device)
+                x = x.float().to(device)
             else:
                 x = x.float().to(device)
             z_mu, _z_logvar, z_noize = model.encoder[test_modality](x)
@@ -374,20 +375,20 @@ def generate_synthetic_dataset(cfg, dataset, model):
         csl_test_indice: test indicies.
     """
     logger.info("ZSL embedding generation")
-    (
-        zsl_emb_object_indice,
-        zsl_emb_class,
-        zsl_emb_class_label,
-    ) = dataset.get_zsl_emb_indice(cfg.ZSL.SAMPLES_PER_CLASS)
+    # (
+    #     zsl_emb_object_indice,
+    #     zsl_emb_class,
+    #     zsl_emb_class_label,
+    # ) = dataset.get_zsl_emb_indice(cfg.ZSL.SAMPLES_PER_CLASS)
 
     # Set CADA-Vae model to evaluate mode
     model.eval()
 
     # Generate zsl embeddings for train seen images
     if cfg.GENERALIZED:
-        sampler = SubsetRandomSampler(zsl_emb_object_indice)
+        dataset = GenEmbeddingDataset(cfg.DATA.FEAT_EMB.PATH, "trainval")
         loader = DataLoader(
-            dataset, batch_size=cfg.ZSL.BATCH_SIZE, sampler=sampler
+            dataset, batch_size=cfg.ZSL.BATCH_SIZE
         )
 
         zsl_emb_img, zsl_emb_labels_img = eval_VAE(

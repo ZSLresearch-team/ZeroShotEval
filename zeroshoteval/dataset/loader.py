@@ -6,7 +6,8 @@ from zeroshoteval.dataset.dataset import ObjEmbeddingDataset
 
 def construct_loader(cfg, split):
     """
-    Constructs the dataloader for zsl procedure and the given dataset.
+    Constructs the dataloader for zsl train/test procedure and the given
+        dataset.
     
     Args:
         cfg(CfgNode): configs. Detail can de found in 
