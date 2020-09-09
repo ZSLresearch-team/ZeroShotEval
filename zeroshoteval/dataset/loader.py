@@ -8,9 +8,9 @@ def construct_loader(cfg, split):
     """
     Constructs the dataloader for zsl train/test procedure and the given
         dataset.
-    
+
     Args:
-        cfg(CfgNode): configs. Detail can de found in 
+        cfg(CfgNode): configs. Detail can de found in
             zeroshoteval/config/defaults.py
         split(str): the split of the data loader. Include `trainval` and
             `test` for now.
@@ -26,12 +26,12 @@ def construct_loader(cfg, split):
 
     dataset = ObjEmbeddingDataset(cfg.DATA.FEAT_EMB.PATH, ["IMG"], split)
     loader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=cfg.ZSL.BATCH_SIZE,
-            shuffle=shuffle,
-            num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-            pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
-            drop_last=drop_last,
-        )
-    
+        dataset,
+        batch_size=cfg.ZSL.BATCH_SIZE,
+        shuffle=shuffle,
+        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
+        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
+        drop_last=drop_last,
+    )
+
     return loader

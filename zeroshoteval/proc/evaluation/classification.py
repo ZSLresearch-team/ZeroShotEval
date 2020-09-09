@@ -59,7 +59,6 @@ def train_cls(
     unseen_classes,
     train_loader,
     test_loader,
-    verbose=1,
 ):
     """
     Train Softmax classifier model
@@ -74,8 +73,6 @@ def train_cls(
         train_loader: loaer of the train data.
         test_seen_loader: loader of the test seen data.
         test_unseen_loader: loader of the test unseen data.
-        verbose: boolean or Int. The higher value verbose is -
-            the more info will you get.
 
     Returns:
         loss_hist(list): train loss history.
@@ -242,7 +239,6 @@ def classification_procedure(
         unseen_classes,
         train_loader,
         test_loader,
-        verbose=cfg.VERBOSE,
     )
 
     best_H_idx = acc_H_hist.index(max(acc_H_hist))

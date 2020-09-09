@@ -17,15 +17,14 @@ class ObjEmbeddingDataset(Dataset):
         Args:
             data(dict): dict mapping modalities name to modalities object
                 embeddings.
-            labels: list of ground truth labels for objects.
-            split_df: pandas dataframe with dataset splits
             object_modalities: list of modalities names, wich describes
                 objects, not classes.
+            split(str): data split, e.g. `train`, `trainval`, `test`.
         """
         self.datadir = datadir
         self.data = None
         self.labels = None
-        
+
         assert split in ["trainval", "test", "ce"]
         self.split = split
 
@@ -34,36 +33,34 @@ class ObjEmbeddingDataset(Dataset):
         self.test_seen_indices = None
         self.test_unseen_indices = None
 
-        self.read_matdata()
+        self._read_matdata()
 
-        # self.seen_classes = np.unique(self.labels[self.train_indices])
-        # self.unseen_classes = np.unique(self.labels[self.test_unseen_indices])
-        # self.num_seen_classes = len(self.seen_classes)
-        # self.num_unseen_classes = len(self.unseen_classes)
-        # self.num_classes = len(self.seen_classes) + len(self.unseen_classes)
+        self.seen_classes = np.unique(self.la[self.train_indices])
+        self.unseen_classes = np.unique(self.la[self.test_unseen_indices])
+        self.num_seen_classes = len(self.seen_classes)
+        self.num_unseen_classes = len(self.unseen_classes)
+        self.num_classes = len(self.seen_classes) + len(self.unseen_classes)
 
-        # self.seen_class_mapping = {
-        #     old_label: new_label
-        #     for old_label, new_label in zip(
-        #         self.seen_classes, np.arange(self.num_seen_classes)
-        #     )
-        # }
-        # self.unseen_class_mapping = {
-        #     old_label: new_label
-        #     for old_label, new_label in zip(
-        #         self.unseen_classes, np.arange(self.num_unseen_classes)
-        #     )
-        # }
+        self.seen_class_mapping = {
+            old_label: new_label
+            for old_label, new_label in zip(
+                self.seen_classes, np.arange(self.num_seen_classes)
+            )
+        }
+        self.unseen_class_mapping = {
+            old_label: new_label
+            for old_label, new_label in zip(
+                self.unseen_classes, np.arange(self.num_unseen_classes)
+            )
+        }
         self.modalities = [mod.upper() for mod in self.data.keys()]
         self.object_modalities = object_modalities
         self.class_modalities = list(
             set(self.modalities) - set(object_modalities)
         )
 
-
     def __len__(self):
         return len(self.labels)
-
 
     def __getitem__(self, idx):
 
@@ -82,72 +79,9 @@ class ObjEmbeddingDataset(Dataset):
 
         return sample_data, sample_label
 
-
-    def get_zsl_emb_indice(self, samples_per_modality_class, generalized=True):
-        r"""
-        Creates indices of dataset to create zsl embeddings dataset.
-
-        Args:
-            samples_per_modality_class(CfgNode): samples generated per class
-                for each modality.
-            generalized(bool): if ``True`` get indices for generalized mod,
-                if ``False`` -
-            for few-shot learning
-
-        Returns:
-            indices_obj: array with indices of object modality
-            indices_class: array with indices of class modality
+    def _read_matdata(self):
         """
-        # !replase with dict : modality_name -> indices
-        indices_obj = np.array([], dtype=np.int64)
-        usneen_classes_emb = np.array([], dtype=np.float64)
-        usneen_classes_emb_labels = np.array([], dtype=np.int64)
-
-        for (
-            modality_name,
-            samples_per_class,
-        ) in samples_per_modality_class.items():
-            if (modality_name in self.object_modalities) and generalized:
-                for label in self.seen_classes:
-                    class_indices = np.intersect1d(
-                        np.sort(self.train_indices),
-                        np.where(self.labels == label),
-                    )
-
-                    class_indices = np.resize(class_indices, samples_per_class)
-                    indices_obj = np.append(indices_obj, class_indices)
-
-            else:
-
-                usneen_classes_emb = self.data[modality_name][
-                    self.unseen_classes
-                ]
-                if not generalized:
-                    unseen_labels = np.arange(0, len(self.unseen_classes))
-                else:
-                    unseen_labels = self.unseen_classes
-
-                usneen_classes_emb_labels = np.append(
-                    usneen_classes_emb_labels, unseen_labels
-                )
-
-                usneen_classes_emb = np.resize(
-                    usneen_classes_emb,
-                    (
-                        samples_per_class * self.num_unseen_classes,
-                        usneen_classes_emb.shape[1],
-                    ),
-                )
-                usneen_classes_emb_labels = np.resize(
-                    usneen_classes_emb_labels,
-                    samples_per_class * self.num_unseen_classes,
-                )
-
-        return indices_obj, usneen_classes_emb, usneen_classes_emb_labels
-
-    def read_matdata(self):
-        """
-        Reading mat dataset form datadir
+        Loads data from mat files
         """
         # Getting CNN features and labels
         logger.info(
@@ -161,6 +95,11 @@ class ObjEmbeddingDataset(Dataset):
 
         # Getting data splits and class attributes
         att_splits = sio.loadmat(self.datadir + "att_splits.mat")
+        self.train_indices = att_splits["trainval_loc"].squeeze() - 1
+        self.test_seen_indices = att_splits["test_seen_loc"].squeeze() - 1
+        self.test_unseen_indices = att_splits["test_unseen_loc"].squeeze() - 1
+        self.test_indices = None
+        self.la = labels
         # numpy array index starts from 0, matlab starts from 1
         if self.split in ["trainval"]:
             indices = (
@@ -169,14 +108,12 @@ class ObjEmbeddingDataset(Dataset):
         elif self.split in ["test"]:
             test_seen_indices = att_splits["test_seen_loc"].squeeze() - 1
             test_unseen_indices = att_splits["test_unseen_loc"].squeeze() - 1
-            indices = np.append(
-                test_seen_indices, test_unseen_indices
-            )
-    
-        class_attr = torch.from_numpy(att_splits["att"].T)
+            indices = np.append(test_seen_indices, test_unseen_indices)
+
+        class_attr = att_splits["att"].T
 
         scaler = preprocessing.MinMaxScaler()
-        if self.split =="ce":
+        if self.split == "ce":
             feature = scaler.fit_transform(feature)
             self.labels = labels
         else:
@@ -195,37 +132,31 @@ class ObjEmbeddingDataset(Dataset):
 
 
 class GenEmbeddingDataset(Dataset):
-    """Object embeddings dataset"""
+    """Object embeddings dataset for generating ZSL embeddings"""
 
-    def __init__(self, cfg, split):
+    def __init__(self, cfg, split, mod):
         """
         Args:
-            data(dict): dict mapping modalities name to modalities object
-                embeddings.
-            labels: list of ground truth labels for objects.
-            split_df: pandas dataframe with dataset splits
-            object_modalities: list of modalities names, wich describes
-                objects, not classes.
+            cfg: configs. Details can be found in
+                zeroshoteval/config/defaults.py
+            split(str):
+            mod(str):
         """
         self.datadir = cfg.DATA.FEAT_EMB.PATH
-        self.split = split
+        self.samples_per_class = cfg.ZSL.SAMPLES_PER_CLASS
         self.data = None
         self.labels = None
 
-        assert split in ["trainval", "test", "ce"]
+        assert split in ["trainval", "test", "test_unseen"]
+        assert mod in ["CLS_ATTR", "IMG"]
+
         self.split = split
+        self.mod = mod
 
-        self.train_indices = None
-        self.test_indices = None
-        self.test_seen_indices = None
-        self.test_unseen_indices = None   
-
-        self.read_matdata()
-
+        self._read_matdata()
 
     def __len__(self):
         return len(self.labels)
-
 
     def __getitem__(self, idx):
 
@@ -234,100 +165,74 @@ class GenEmbeddingDataset(Dataset):
 
         return sample_data, sample_label
 
-
-    def get_zsl_emb_indice(self, samples_per_modality_class, generalized=True):
-        r"""
-        Creates indices of dataset to create zsl embeddings dataset.
-
-        Args:
-            samples_per_modality_class(CfgNode): samples generated per class
-                for each modality.
-            generalized(bool): if ``True`` get indices for generalized mod,
-                if ``False`` -
-            for few-shot learning
-
-        Returns:
-            indices_obj: array with indices of object modality
-            indices_class: array with indices of class modality
-        """
-        # !replase with dict : modality_name -> indices
-        indices_obj = np.array([], dtype=np.int64)
-        usneen_classes_emb = np.array([], dtype=np.float64)
-        usneen_classes_emb_labels = np.array([], dtype=np.int64)
-
-        for (
-            modality_name,
-            samples_per_class,
-        ) in samples_per_modality_class.items():
-            if (modality_name in self.object_modalities) and generalized:
-                for label in self.seen_classes:
-                    class_indices = np.intersect1d(
-                        np.sort(self.train_indices),
-                        np.where(self.labels == label),
-                    )
-
-                    class_indices = np.resize(class_indices, samples_per_class)
-                    indices_obj = np.append(indices_obj, class_indices)
-
-            else:
-
-                usneen_classes_emb = self.data[modality_name][
-                    self.unseen_classes
-                ]
-                if not generalized:
-                    unseen_labels = np.arange(0, len(self.unseen_classes))
-                else:
-                    unseen_labels = self.unseen_classes
-
-                usneen_classes_emb_labels = np.append(
-                    usneen_classes_emb_labels, unseen_labels
-                )
-
-                usneen_classes_emb = np.resize(
-                    usneen_classes_emb,
-                    (
-                        samples_per_class * self.num_unseen_classes,
-                        usneen_classes_emb.shape[1],
-                    ),
-                )
-                usneen_classes_emb_labels = np.resize(
-                    usneen_classes_emb_labels,
-                    samples_per_class * self.num_unseen_classes,
-                )
-
-        return indices_obj, usneen_classes_emb, usneen_classes_emb_labels
-
-
-    def read_matdata(self):
+    def _read_matdata(self):
         """
         Reading mat dataset form datadir
         """
-        # Getting CNN features and labels
-        logger.info(
-            f"Loading computed embeddings from {self.datadir}... "
-            f"with {self.split} split"
-        )
+        scaler = preprocessing.MinMaxScaler()
         att_splits = sio.loadmat(self.datadir + "att_splits.mat")
-        if self.split in ['trainval']:
-            train_indices = (
-                att_splits["trainval_loc"].squeeze() - 1
-            ) 
-            indices_obj = np.array([], dtype=np.int64)
+        cnn_features = sio.loadmat(self.datadir + "res101.mat")
+        feature = cnn_features["features"].T
+        labels = cnn_features["labels"].astype(int).squeeze() - 1
 
-            cnn_features = sio.loadmat(self.datadir + "res101.mat")
-            feature = cnn_features["features"].T
-            labels = cnn_features["labels"].astype(int).squeeze() - 1
-            seen_classes = np.unique(labels[train_indices])
-            for label in seen_classes: 
-                class_indices = np.intersect1d(
-                    np.sort(train_indices),
-                    np.where(labels == label),
+        # Load image modality data
+        if self.mod in ["IMG"]:
+            # Load trainval data
+            if self.split in ["trainval"]:
+                train_indices = att_splits["trainval_loc"].squeeze() - 1
+                feature[train_indices] = scaler.fit_transform(
+                    feature[train_indices]
                 )
-            class_indices = np.resize(class_indices, 50)
-            indices_obj = np.append(indices_obj, class_indices)
-            self.data = feature[indices_obj,]
-            self.labels = labels[indices_obj,]
+                indices_obj = np.array([], dtype=np.int64)
+                seen_classes = np.unique(labels[train_indices])
+                for label in seen_classes:
+                    class_indices = np.intersect1d(
+                        np.sort(train_indices),
+                        np.where(labels == label),
+                    )
+                    class_indices = np.resize(
+                        class_indices, self.samples_per_class.IMG
+                    )
+                    indices_obj = np.append(indices_obj, class_indices)
+                print(len(indices_obj))
+                self.data = feature[indices_obj]
+                self.labels = labels[indices_obj]
+            # Load test data
+            elif self.split in ["test"]:
+                test_seen_indices = att_splits["test_seen_loc"].squeeze() - 1
+                test_unseen_indices = (
+                    att_splits["test_unseen_loc"].squeeze() - 1
+                )
+                test_indices = np.append(test_seen_indices, test_unseen_indices)
+                self.data = scaler.fit_transform(feature[test_indices])
+                self.labels = labels[test_indices]
+            # Load data for test unseen classes
+            elif self.split in ["test_unseen"]:
+                test_unseen_indices = (
+                    att_splits["test_unseen_loc"].squeeze() - 1
+                )
 
-        logger.info("Embeddings succesfully loaded.")
+                self.data = scaler.fit_transform(feature[test_unseen_indices])
+                self.labels = labels[test_unseen_indices]
 
-        return None
+        # Load class attributes modality data
+        elif self.mod in ["CLS_ATTR"]:
+            class_attr = att_splits["att"].T
+            # Load data for test unseen classes
+            if self.split in ["test_unseen"]:
+                test_unseen_indices = (
+                    att_splits["test_unseen_loc"].squeeze() - 1
+                )
+                unseen_classes = np.unique(labels[test_unseen_indices])
+                usneen_classes_attr = class_attr[unseen_classes]
+                self.data = np.resize(
+                    usneen_classes_attr,
+                    (
+                        self.samples_per_class.CLS_ATTR * len(unseen_classes),
+                        usneen_classes_attr.shape[1],
+                    ),
+                )
+                self.labels = np.resize(
+                    unseen_classes,
+                    self.samples_per_class.CLS_ATTR * len(unseen_classes),
+                )
