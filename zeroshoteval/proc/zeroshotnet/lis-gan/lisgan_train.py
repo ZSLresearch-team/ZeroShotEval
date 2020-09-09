@@ -9,6 +9,17 @@ import torch.optim as optim
 from .classifier import Classifier_train
 from .gan import Model_discriminator, Model_generator
 
+from zeroshoteval.utils.misc import log_model_info
+from zeroshoteval.utils.optimizer_helper import build_optimizer
+
+import itertools
+import logging
+
+from ..build import ZSL_MODEL_REGISTRY
+from .cada_vae_model import VAEModel
+
+logger = logging.getLogger(__name__)
+
 def train_LisGAN(config, model, train_loader, optimizer):
     """
     TRain lisgan procedure.
@@ -22,6 +33,7 @@ def train_LisGAN(config, model, train_loader, optimizer):
        loss_history(dict): dict with mean loss for each epoch for generator, 
                             discriminator and summary loss.
     """
+    logger.info("Train LISGAN model")
     net_discriminator = model['discriminator'].float()
     net_generator = model['generator'].float()
     for net in model:
@@ -36,7 +48,8 @@ def train_LisGAN(config, model, train_loader, optimizer):
     real_soul_sample = generate_real_soul_samples(train_loader.dataset, 
                                                   config.LISGAN.N_CLUSTER, config.DEVICE)
     classifier = Classifier_train(config.DEVICE, config.LISGAN.CLASSIFIER_NUM_EPOCH,
-                                  config.sample_dim, config.num_classes, train_loader)
+                                  config.DATA.FEAT_EMB.DIM.IMG, config.DATA.NUM_CLASSES,
+                                  train_loader)
     classifier.fit()
     for epoch in range(config.LISGAN.N_EPOCH):
         mean_lossD = 0
@@ -50,9 +63,9 @@ def train_LisGAN(config, model, train_loader, optimizer):
             labels = torch.tensor(remap_labels(data[1], train_classes), 
                                   device=config.DEVICE)
 
-            noise = torch.zeros((config.ZSL.BATCH_SIZE, config.noize_size), 
+            noise = torch.zeros((config.ZSL.BATCH_SIZE, config.LISGAN.NOISE_SIZE), 
                                 device=config.DEVICE, dtype=torch.float)
-            for iter_d in range(config.train_discriminator_num_iter):
+            for iter_d in range(config.LISGAN.TRAIN_DISCRIMINATOR_NUM_ITER):
                 net_discriminator.zero_grad()
                 discriminator_score_real = net_discriminator(sample_embeddings, 
                                                              sample_class_attributes)
@@ -70,7 +83,7 @@ def train_LisGAN(config, model, train_loader, optimizer):
                                                          sample_class_attributes, 
                                                          config.DEVICE,
                                                          config.ZSL.BATCH_SIZE)
-                discriminator_loss = discriminator_score_fake - discriminator_score_real + gradient_penalty*config.beta
+                discriminator_loss = discriminator_score_fake - discriminator_score_real + gradient_penalty*config.LISGAN.BETA
 
                 optimizerD.zero_grad()
                 discriminator_loss.backward()
@@ -86,23 +99,21 @@ def train_LisGAN(config, model, train_loader, optimizer):
             classification_loss = classifier.get_loss(fake_embeddings, labels)
 
             labels = labels.reshape(config.ZSL.BATCH_SIZE, 1)
-            dists1 = torch.FloatTensor(distance.cdist(fake_embeddings.detach().numpy(), 
-                                                      real_soul_sample.detach().numpy()))
-            min_index1 = torch.zeros(config.ZSL.BATCH_SIZE, config.train_cls_num,
-                               device=config.DEVICE, dtype=torch.int64)
-            for i in range(len(train_classes)):
-                fake_emb_soul_sample_dist = dists1[:,i*config.LISGAN.N_CLUSTER:(i+1)*config.LISGAN.N_CLUSTER]
-                min_index1[:,i] = torch.min(fake_emb_soul_sample_dist, dim=1)[1] + i*config.LISGAN.N_CLUSTER
-            regularization1 = dists1.gather(1, min_index1).gather(1,labels).squeeze().view(-1).mean()
+            regularization1 = calculate_regularization_coef(fake_embeddings,
+                                                            real_soul_sample, 
+                                                            config.DATA.TRAIN_CLS_NUM, 
+                                                            config.LISGAN.N_CLUSTER, 
+                                                            labels, config.DEVICE)
 
             syn_samples, syn_labels = generate_synthesis_samples(net_generator, 
                                     train_classes, class_attributes,
-                                    config.loss_syn_num, config.sample_dim,
-                                    config.DEVICE, config.attribute_size,
-                                    config.noize_size)
-            syn_labels = torch.tensor(remap_labels(syn_labels, train_classes),
-                                      device=config.DEVICE)
-            transform_matrix = torch.zeros(config.train_cls_num, syn_samples.shape[0],
+                                    config.LISGAN.NUM_SYNTH_SAMPLES, config.DATA.FEAT_EMB.DIM.IMG ,
+                                    config.DEVICE, config.DATA.FEAT_EMB.DIM.CLS_ATTR,
+                                    config.LISGAN.NOISE_SIZE)
+            syn_labels = remap_labels(syn_labels.cpu().numpy(), train_classes)
+            syn_labels = torch.LongTensor(syn_labels).to(config.DEVICE)
+
+            transform_matrix = torch.zeros(config.DATA.TRAIN_CLS_NUM, syn_samples.shape[0],
                                        device=config.DEVICE, dtype=torch.float) 
             for class_label in remap_labels(train_classes, train_classes):
                 sample_idx = (syn_labels == class_label).nonzero().squeeze()
@@ -111,26 +122,35 @@ def train_LisGAN(config, model, train_loader, optimizer):
                 else:
                     class_sample_number = sample_idx.numel()
                     transform_matrix[class_label][sample_idx] = 1 / class_sample_number * torch.ones(1, class_sample_number).squeeze()
-            synthesis_soul_sample = torch.mm(transform_matrix, syn_samples)  
-            dists2 = torch.FloatTensor(distance.cdist(synthesis_soul_sample.detach().numpy(),
-                                                      real_soul_sample.detach().numpy()))
-            min_index2 = torch.zeros(config.train_cls_num, config.train_cls_num,
-                               device=config.DEVICE, dtype=torch.int64)
-            for i in range(len(train_classes)):
-                fake_soul_samle_real_soul_sample_dist = dists2[:,i*config.LISGAN.N_CLUSTER:(i+1)*config.LISGAN.N_CLUSTER]
-                min_index2[:,i] = torch.min(fake_soul_samle_real_soul_sample_dist,dim=1)[1] + i*config.LISGAN.N_CLUSTER
-            lbl_idx = torch.LongTensor(list(range(len(train_classes))))
-            regularization2 = dists2.gather(1,min_index2).gather(1,lbl_idx.unsqueeze(1)).squeeze().mean()
+            synthesis_soul_sample = torch.mm(transform_matrix, syn_samples)
+            lbl_idx = torch.LongTensor(remap_labels(train_classes, train_classes))
+            lbl_idx = lbl_idx.to(config.DEVICE).unsqueeze(1)
 
-            generator_loss = wasserstein_dist + config.proto_param2 * regularization2 + config.proto_param1 * regularization1  + config.cls_weight * classification_loss
+            regularization2 = calculate_regularization_coef(synthesis_soul_sample, 
+                                                            real_soul_sample,
+                                                            config.DATA.TRAIN_CLS_NUM, 
+                                                            config.LISGAN.N_CLUSTER,
+                                                            lbl_idx,
+                                                            config.DEVICE)
+
+            generator_loss = wasserstein_dist + config.LISGAN.REG2_COEF * regularization2 + config.LISGAN.REG1_COEF * regularization1  + config.LISGAN.CLS_WEIGHT* classification_loss
             generator_loss.backward()
             optimizerG.step()
             mean_lossD += discriminator_loss
             mean_lossG += generator_loss
             sum_loss = mean_lossD + mean_lossG
+
+        mean_lossD = mean_lossD / i_step + 1
+        mean_lossG = mean_lossG / i_step + 1
+        sum_loss = sum_loss / i_step + 1
         loss_history['discriminator_loss'].append(mean_lossD / i_step + 1)
         loss_history['generator_loss'].append(mean_lossG / i_step + 1)
         loss_history['sum_loss'].append(sum_loss / i_step + 1)
+        logger.info(
+            f"Epoch: {epoch+1} "
+            f"Loss: {sum_loss:.1f} "
+            f"Loss discriminator: {mean_lossD} loss generator: {mean_lossG}"
+        )
     return loss_history
 
 
@@ -212,7 +232,7 @@ def generate_synthesis_samples(netG, classes, attribute, number_samples,
     syn_samples = torch.zeros((number_classes * number_samples, sample_size),
                                     device=device, dtype=torch.float)
     syn_labels = torch.zeros((number_classes * number_samples), 
-                            device=device, dtype=torch.float)
+                            device=device, dtype=torch.int)
     syn_att = torch.zeros((number_samples, attribute_size),
                           device=device, dtype=torch.float)
     syn_noise = torch.zeros((number_samples, noize_size),
@@ -221,7 +241,7 @@ def generate_synthesis_samples(netG, classes, attribute, number_samples,
     for i in range(number_classes):
         class_index = classes[i]
         class_att = attribute[class_index]
-        syn_att = (class_att.repeat(number_samples, 1)).float()
+        syn_att[:] = (class_att.repeat(number_samples, 1)).float()
         syn_noise.normal_(0, 1)
         output = netG(syn_noise, syn_att)
         syn_samples[i*number_samples:number_samples*(i+1),:] = output
@@ -240,3 +260,85 @@ def remap_labels(labels, classes):
     remapping_dict = dict(zip(classes, list(range(len(classes)))))
 
     return np.vectorize(remapping_dict.get)(labels)
+
+def calculate_regularization_coef(synthesis_sample, real_soul_sample, 
+                                  train_cls_num, n_clusters, labels, device):
+    """
+    calculate regularisation for generate's loss i.e. mean distances between real
+    soul samples and synthesis samples or soul samples.
+    Args:
+        synthesis_sample(tensor): synthesis object's samples or synthesis object's 
+                                soul samples.
+        real_soul_sample(tensor): soul samples of real samples.
+        train_cls_num(int): number of train classes.
+        n_clusters(int):  number of soul samples for each class.
+        labels(tensor): class label for synthesis samples.
+        device(str): device to use.
+    Returns:
+       regularization(): regularization addition for generator loss.
+    """
+    np_synthesis_sample = synthesis_sample.cpu().detach().numpy()
+    np_real_soul_sample = real_soul_sample.cpu().numpy()
+    distances = torch.FloatTensor(distance.cdist(np_synthesis_sample, 
+                                                 np_real_soul_sample)).to(device)
+    min_index = torch.zeros(len(np_synthesis_sample), train_cls_num,
+                               device=device, dtype=torch.int64)
+    for i in range(train_cls_num):
+        min_index[:,i] = torch.min(distances[:,i*n_clusters:(i+1)*n_clusters],
+                                    dim=1)[1] + i*n_clusters
+    regularization = distances.gather(1, min_index).gather(1,labels).squeeze()
+    regularization = regularization.view(-1).mean()
+    return regularization
+
+def generate_dataset_classification(train_dataset, config, net_generator):
+    """
+    calculate regularisation for generate's loss i.e. mean distances between real
+    soul samples and synthesis samples or soul samples.
+    Args:
+        train_dataset(torch.Dataset): train dataset.
+        config: config for lisgan.
+        net_generator(nn.Module): generator network.
+    Returns:
+        dataset(dict): A dicttionary include np.array object embeddings for train
+        and test classifier and appropriate labels of the samples.
+        train_indexes(np.array):Indices of train samples in dataset.
+        test_indexes(np.array):Indices of test samples in dataset.
+    """
+    logger.info("ZSL embedding dataset generation")
+    object_modalities = train_dataset.object_modalities[0]
+    class_modalities = train_dataset.class_modalities[0]
+    train_emb = train_dataset.data[object_modalities][train_dataset.train_indices]
+    train_labels = train_dataset.labels[train_dataset.train_indices]
+
+    class_attributes = train_dataset.data[class_modalities]
+    net_generator.eval()
+    with torch.no_grad():
+        unseen_train_emb, unseen_train_labels = generate_synthesis_samples(net_generator, 
+                                                train_dataset.unseen_classes, 
+                                                class_attributes, config.LISGAN.CLS_NUM_SAMPLES, 
+                                                config.DATA.FEAT_EMB.DIM.IMG, config.DEVICE, 
+                                                config.DATA.FEAT_EMB.DIM.CLS_ATTR, 
+                                                config.LISGAN.NOISE_SIZE)
+    unseen_train_emb = unseen_train_emb.cpu().numpy()
+    unseen_train_labels = unseen_train_labels.cpu().numpy()
+    
+    unseen_test_emb = train_dataset.data[object_modalities][train_dataset.test_unseen_indices]
+    unseen_test_labels = train_dataset.labels[train_dataset.test_unseen_indices]
+    if config.GENERALIZED:
+        seen_test_emb = train_dataset.data[object_modalities][train_dataset.test_seen_indices]
+        seen_test_labels = train_dataset.labels[train_dataset.test_seen_indices]
+        dataset = {object_modalities:np.concatenate([train_emb, unseen_train_emb,
+                                                     seen_test_emb, 
+                                                     unseen_test_emb], axis=0), 
+               'labels':np.concatenate([train_labels, unseen_train_labels, 
+                                        seen_test_labels, unseen_test_labels], axis=0)}
+        train_indexes = np.arange(len(train_emb) + len(unseen_train_emb))
+        test_indexes = np.arange(len(seen_test_emb) + len(unseen_test_emb)) + len(train_indexes)
+    else:
+        dataset = {object_modalities:np.concatenate([train_emb, unseen_train_emb,
+                                                     unseen_test_emb], axis=0), 
+               'labels':np.concatenate([train_labels, unseen_train_labels, 
+                                        unseen_test_labels], axis=0)}
+        train_indexes = np.arange(len(train_emb) + len(unseen_train_emb))
+        test_indexes = np.arange(len(unseen_test_emb)) + len(train_indexes)
+    return dataset, train_indexes, test_indexes
