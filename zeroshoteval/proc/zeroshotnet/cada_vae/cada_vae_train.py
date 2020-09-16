@@ -9,7 +9,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from zeroshoteval.utils.misc import log_model_info
 from zeroshoteval.utils.optimizer_helper import build_optimizer
 from zeroshoteval.dataset.loader import construct_loader
-from zeroshoteval.dataset.dataset import GenEmbeddingDataset
+from zeroshoteval.dataset.loader_helper import build_gen_loaders
 
 from ..build import ZSL_MODEL_REGISTRY
 from .cada_vae_model import VAEModel
@@ -381,26 +381,19 @@ def generate_synthetic_dataset(cfg, model):
     # Set CADA-Vae model to evaluate mode
     model.eval()
 
+    loader = build_gen_loaders(cfg)
     # Generate zsl embeddings for train seen images
     if cfg.GENERALIZED:
-        dataset = GenEmbeddingDataset(cfg, "trainval", "IMG")
-
-        loader = DataLoader(dataset, batch_size=cfg.ZSL.BATCH_SIZE)
-
         zsl_emb_img, zsl_emb_labels_img = eval_VAE(
-            model, loader, "IMG", cfg.DEVICE
+            model, loader["train_img_loader"], "IMG", cfg.DEVICE
         )
     else:
         zsl_emb_img = torch.FloatTensor()
         zsl_emb_labels_img = torch.LongTensor()
 
     # Generate zsl embeddings for unseen classes
-    zsl_emb_dataset = GenEmbeddingDataset(cfg, "test_unseen", "CLS_ATTR")
-
-    loader = DataLoader(zsl_emb_dataset, batch_size=cfg.ZSL.BATCH_SIZE)
-
     zsl_emb_cls_attr, labels_cls_attr = eval_VAE(
-        model, loader, "CLS_ATTR", cfg.DEVICE
+        model, loader["train_attr_loader"], "CLS_ATTR", cfg.DEVICE
     )
     if not cfg.GENERALIZED:
         labels_cls_attr = remap_labels(
@@ -409,13 +402,9 @@ def generate_synthetic_dataset(cfg, model):
         labels_cls_attr = torch.from_numpy(labels_cls_attr)
 
     # Generate zsl embeddings for test data
-    dataset = GenEmbeddingDataset(cfg, "test", "IMG")
-
-    loader = DataLoader(dataset, batch_size=cfg.ZSL.BATCH_SIZE)
-
     zsl_emb_test, zsl_emb_labels_test = eval_VAE(
         model,
-        loader,
+        loader["test_loader"],
         "IMG",
         cfg.DEVICE,
         reparametrize_with_noise=False,
@@ -478,7 +467,6 @@ def CADA_VAE_train_procedure(cfg, dataset):
         hidden_size_encoder=cfg.CADA_VAE.HIDDEN_SIZE.ENCODER,
         hidden_size_decoder=cfg.CADA_VAE.HIDDEN_SIZE.DECODER,
         latent_size=cfg.CADA_VAE.LATENT_SIZE,
-        modalities=dataset.modalities,
         feature_dimensions=cfg.DATA.FEAT_EMB.DIM,
         use_bn=cfg.CADA_VAE.USE_BN,
         use_dropout=False,

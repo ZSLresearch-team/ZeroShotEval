@@ -13,17 +13,16 @@ def experiment(cfg):
 
     """
 
-    data = ObjEmbeddingDataset(cfg.DATA.FEAT_EMB.PATH, ["IMG"], "ce")
+    data = ObjEmbeddingDataset(cfg, ["IMG"], "ce")
 
-    (zsl_emb_dataset, csl_train_indice, csl_test_indice,) = build_zsl(cfg)(
-        cfg, data
-    )
+    (zsl_emb_dataset, csl_train_indice, csl_test_indice,) = build_zsl(
+        cfg
+    )(cfg, data)
 
     # Train
     num_classes = (
         data.num_classes if cfg.GENERALIZED else data.num_unseen_classes
     )
-
 
     (
         _train_loss_hist,

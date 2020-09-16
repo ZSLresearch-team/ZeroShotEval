@@ -1,7 +1,10 @@
 # Script for dataloader construction
 import torch
 
-from zeroshoteval.dataset.dataset import ObjEmbeddingDataset
+from zeroshoteval.dataset.dataset import (
+    ObjEmbeddingDataset,
+    GenEmbeddingDataset,
+)
 
 
 def construct_loader(cfg, split):
@@ -14,6 +17,9 @@ def construct_loader(cfg, split):
             zeroshoteval/config/defaults.py
         split(str): the split of the data loader. Include `trainval` and
             `test` for now.
+
+    Returns:
+        loader(DataLoader): data loader for zsl train/test procedure
     """
     # Note that val train and val split temporaly unavailable
     assert split in ["trainval", "test"]
@@ -24,7 +30,7 @@ def construct_loader(cfg, split):
         shuffle = False
         drop_last = False
 
-    dataset = ObjEmbeddingDataset(cfg.DATA.FEAT_EMB.PATH, ["IMG"], split)
+    dataset = ObjEmbeddingDataset(cfg, ["IMG"], split)
     loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=cfg.ZSL.BATCH_SIZE,
@@ -32,6 +38,30 @@ def construct_loader(cfg, split):
         num_workers=cfg.DATA_LOADER.NUM_WORKERS,
         pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
         drop_last=drop_last,
+    )
+
+    return loader
+
+
+def _construct_gen_loader(cfg, split, mod):
+    """
+    Construct dataloader for generating zsl embeddings
+
+    Args:
+        cfg: configs. Details can be found in
+            zeroshoteval/config/defaults.py
+        split(str): data split, e.g. `train`, `trainval`, `test`.
+        mod(str): modality name
+
+    Returns:
+        loader(DataLoader): data loader for generating zsl embeddings
+    """
+    dataset = GenEmbeddingDataset(cfg, split, mod)
+    loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=cfg.ZSL.BATCH_SIZE,
+        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
+        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
     )
 
     return loader

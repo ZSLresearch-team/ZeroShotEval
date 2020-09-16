@@ -10,8 +10,7 @@ from config import config
 
 
 def init_arguments():
-    """Initialize arguments
-    """
+    """Initialize arguments"""
     parser = argparse.ArgumentParser(
         description="Main script-launcher for evaluation of ZSL models"
     )
@@ -38,8 +37,7 @@ def init_arguments():
 
 
 def check_arguments(args):
-    """Check arguments compatibility and correctness.
-    """
+    """Check arguments compatibility and correctness."""
     procedures = args.procedures.split(",")
     if "classification" in procedures:
         if args.zsl_train_embeddings_path == "":
@@ -49,8 +47,7 @@ def check_arguments(args):
 
 
 def load_arguments():
-    """Initialize, check and pass arguments.
-    """
+    """Initialize, check and pass arguments."""
     parser = init_arguments()
     args = parser.parse_args()
     check_arguments(args)

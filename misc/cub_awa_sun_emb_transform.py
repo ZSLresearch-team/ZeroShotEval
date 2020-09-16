@@ -131,7 +131,7 @@ def load_dataset_embeddings(
     matdata_file="res101.mat",
     matattrsplit_file="att_splits.mat",
 ):
-    """Loads specified dataset to dictionary structure 
+    """Loads specified dataset to dictionary structure
     for further saving to pickle file.
     """
     valid_datasets = ["cub", "sun", "awa1", "awa2"]

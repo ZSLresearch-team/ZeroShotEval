@@ -4,8 +4,7 @@ from torch.utils.data import TensorDataset
 
 
 def load_zsl_emb(datadir):
-    """
-    """
+    """"""
     train_X = torch.load(datadir + "zsl_emb/train_X.pt")
     train_Y = torch.load(datadir + "zsl_emb/train_Y.pt")
     test_seen_X = torch.load(datadir + "zsl_emb/test_seen_X.pt")

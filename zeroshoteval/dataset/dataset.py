@@ -12,16 +12,16 @@ logger = logging.getLogger(__name__)
 class ObjEmbeddingDataset(Dataset):
     """Object embeddings dataset"""
 
-    def __init__(self, datadir, object_modalities, split):
+    def __init__(self, cfg, object_modalities, split):
         """
         Args:
-            data(dict): dict mapping modalities name to modalities object
-                embeddings.
+            cfg(CfgNode): configs. Detail can de found in
+            zeroshoteval/config/defaults.py
             object_modalities: list of modalities names, wich describes
                 objects, not classes.
             split(str): data split, e.g. `train`, `trainval`, `test`.
         """
-        self.datadir = datadir
+        self.datadir = cfg.DATA.FEAT_EMB.PATH
         self.data = None
         self.labels = None
 
@@ -85,8 +85,8 @@ class ObjEmbeddingDataset(Dataset):
         """
         # Getting CNN features and labels
         logger.info(
-            f"Loading computed embeddings from {self.datadir}... "
-            f"with {self.split} split"
+            f"Loading computed {self.split} split embeddings "
+            f"from {self.datadir}... "
         )
 
         cnn_features = sio.loadmat(self.datadir + "res101.mat")
@@ -139,8 +139,8 @@ class GenEmbeddingDataset(Dataset):
         Args:
             cfg: configs. Details can be found in
                 zeroshoteval/config/defaults.py
-            split(str):
-            mod(str):
+            split(str): data split, e.g. `train`, `trainval`, `test`.
+            mod(str): modality name
         """
         self.datadir = cfg.DATA.FEAT_EMB.PATH
         self.samples_per_class = cfg.ZSL.SAMPLES_PER_CLASS
@@ -194,7 +194,7 @@ class GenEmbeddingDataset(Dataset):
                         class_indices, self.samples_per_class.IMG
                     )
                     indices_obj = np.append(indices_obj, class_indices)
-                print(len(indices_obj))
+
                 self.data = feature[indices_obj]
                 self.labels = labels[indices_obj]
             # Load test data
