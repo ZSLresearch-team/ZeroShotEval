@@ -161,15 +161,12 @@ def compute_mean_per_class_accuracies(
             labels_all = torch.cat((labels_all, y), 0)
             preds_all = torch.cat((preds_all, preds.long()), 0)
 
-    conf_matrix = confusion_matrix(
-        labels_all.cpu().numpy(), preds_all.cpu().numpy()
-    )
+    conf_matrix = confusion_matrix(labels_all.cpu().numpy(), preds_all.cpu().numpy())
     acc_seen = (
         np.diag(conf_matrix)[seen_classes] / conf_matrix.sum(1)[seen_classes]
     ).mean()
     acc_unseen = (
-        np.diag(conf_matrix)[unseen_classes]
-        / conf_matrix.sum(1)[unseen_classes]
+        np.diag(conf_matrix)[unseen_classes] / conf_matrix.sum(1)[unseen_classes]
     ).mean()
 
     if (acc_unseen < 1e-4) or (acc_seen < 1e-4):
@@ -183,12 +180,6 @@ def compute_mean_per_class_accuracies(
 def classification_procedure(
     cfg,
     data,
-    in_features,
-    num_classes,
-    train_indicies,
-    test_indicies,
-    seen_classes,
-    unseen_classes,
 ):
     """
     Launches classifier training.
@@ -196,13 +187,7 @@ def classification_procedure(
     Args:
         cfg(CfgNode): configs. Details can be found in
             zeroshoteval/config/defaults.py
-        data(Dataset): torch tensor dataset for ZSL embeddings.
-        in_features(int): number of input features.
-        num_classes(int): number of classes.
-        train_indicies: indicies of training data.
-        test_indices: inicies of testing data.
-        seen_classes(numpy array): labels of seen classes.
-        unseen_classes(numpy array): labels of unseen classes.
+        data(dict): dictionary with zsl dataset and another extra data.
 
     Returns:
         loss_hist(list): train loss history.
@@ -213,18 +198,20 @@ def classification_procedure(
 
     RNG_seed_setup(cfg)
     logger.info("Building final classifier model")
-    classifier = SoftmaxClassifier(in_features, num_classes)
+    classifier = SoftmaxClassifier(
+        data["dataset"].tensors[0].size(1), data["num_classes"]
+    )
     classifier.to(cfg.DEVICE)
     log_model_info(classifier, "Final Classifier")
 
-    train_sampler = SubsetRandomSampler(train_indicies)
-    test_sampler = SubsetRandomSampler(test_indicies)
+    train_sampler = SubsetRandomSampler(data["train_indicies"])
+    test_sampler = SubsetRandomSampler(data["test_indicies"])
 
     train_loader = DataLoader(
-        data, batch_size=cfg.CLS.BATCH_SIZE, sampler=train_sampler
+        data["dataset"], batch_size=cfg.CLS.BATCH_SIZE, sampler=train_sampler
     )
     test_loader = DataLoader(
-        data, batch_size=cfg.CLS.BATCH_SIZE, sampler=test_sampler
+        data["dataset"], batch_size=cfg.CLS.BATCH_SIZE, sampler=test_sampler
     )
 
     optimizer = build_optimizer(classifier, cfg, "CLS")
@@ -234,9 +221,9 @@ def classification_procedure(
         optimizer,
         cfg.DEVICE,
         cfg.CLS.EPOCH,
-        num_classes,
-        seen_classes,
-        unseen_classes,
+        data["num_classes"],
+        data["seen_classes"],
+        data["unseen_classes"],
         train_loader,
         test_loader,
     )

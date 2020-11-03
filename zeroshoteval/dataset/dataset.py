@@ -25,7 +25,7 @@ class ObjEmbeddingDataset(Dataset):
         self.data = None
         self.labels = None
 
-        assert split in ["trainval", "test", "ce"]
+        assert split in ["trainval", "test"]
         self.split = split
 
         self.train_indices = None
@@ -55,9 +55,7 @@ class ObjEmbeddingDataset(Dataset):
         }
         self.modalities = [mod.upper() for mod in self.data.keys()]
         self.object_modalities = object_modalities
-        self.class_modalities = list(
-            set(self.modalities) - set(object_modalities)
-        )
+        self.class_modalities = list(set(self.modalities) - set(object_modalities))
 
     def __len__(self):
         return len(self.labels)
@@ -113,12 +111,8 @@ class ObjEmbeddingDataset(Dataset):
         class_attr = att_splits["att"].T
 
         scaler = preprocessing.MinMaxScaler()
-        if self.split == "ce":
-            feature = scaler.fit_transform(feature)
-            self.labels = labels
-        else:
-            feature = scaler.fit_transform(feature[indices])
-            self.labels = labels[indices]
+        feature = scaler.fit_transform(feature[indices])
+        self.labels = labels[indices]
 
         data = {}
         data["IMG"] = feature
@@ -180,9 +174,7 @@ class GenEmbeddingDataset(Dataset):
             # Load trainval data
             if self.split in ["trainval"]:
                 train_indices = att_splits["trainval_loc"].squeeze() - 1
-                feature[train_indices] = scaler.fit_transform(
-                    feature[train_indices]
-                )
+                feature[train_indices] = scaler.fit_transform(feature[train_indices])
                 indices_obj = np.array([], dtype=np.int64)
                 seen_classes = np.unique(labels[train_indices])
                 for label in seen_classes:
@@ -190,9 +182,7 @@ class GenEmbeddingDataset(Dataset):
                         np.sort(train_indices),
                         np.where(labels == label),
                     )
-                    class_indices = np.resize(
-                        class_indices, self.samples_per_class.IMG
-                    )
+                    class_indices = np.resize(class_indices, self.samples_per_class.IMG)
                     indices_obj = np.append(indices_obj, class_indices)
 
                 self.data = feature[indices_obj]
@@ -200,17 +190,13 @@ class GenEmbeddingDataset(Dataset):
             # Load test data
             elif self.split in ["test"]:
                 test_seen_indices = att_splits["test_seen_loc"].squeeze() - 1
-                test_unseen_indices = (
-                    att_splits["test_unseen_loc"].squeeze() - 1
-                )
+                test_unseen_indices = att_splits["test_unseen_loc"].squeeze() - 1
                 test_indices = np.append(test_seen_indices, test_unseen_indices)
                 self.data = scaler.fit_transform(feature[test_indices])
                 self.labels = labels[test_indices]
             # Load data for test unseen classes
             elif self.split in ["test_unseen"]:
-                test_unseen_indices = (
-                    att_splits["test_unseen_loc"].squeeze() - 1
-                )
+                test_unseen_indices = att_splits["test_unseen_loc"].squeeze() - 1
 
                 self.data = scaler.fit_transform(feature[test_unseen_indices])
                 self.labels = labels[test_unseen_indices]
@@ -220,9 +206,7 @@ class GenEmbeddingDataset(Dataset):
             class_attr = att_splits["att"].T
             # Load data for test unseen classes
             if self.split in ["test_unseen"]:
-                test_unseen_indices = (
-                    att_splits["test_unseen_loc"].squeeze() - 1
-                )
+                test_unseen_indices = att_splits["test_unseen_loc"].squeeze() - 1
                 unseen_classes = np.unique(labels[test_unseen_indices])
                 usneen_classes_attr = class_attr[unseen_classes]
                 self.data = np.resize(

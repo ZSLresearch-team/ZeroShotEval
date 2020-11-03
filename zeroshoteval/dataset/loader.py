@@ -30,8 +30,9 @@ def construct_loader(cfg, split):
         shuffle = False
         drop_last = False
 
+    loader_extras = {}
     dataset = ObjEmbeddingDataset(cfg, ["IMG"], split)
-    loader = torch.utils.data.DataLoader(
+    loader_extras["loader"] = torch.utils.data.DataLoader(
         dataset,
         batch_size=cfg.ZSL.BATCH_SIZE,
         shuffle=shuffle,
@@ -39,8 +40,13 @@ def construct_loader(cfg, split):
         pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
         drop_last=drop_last,
     )
+    loader_extras["num_classes"] = (
+        dataset.num_classes if cfg.GENERALIZED else dataset.num_unseen_classes
+    )
+    loader_extras["seen_classes"] = dataset.seen_classes
+    loader_extras["unseen_classes"] = dataset.unseen_classes
 
-    return loader
+    return loader_extras
 
 
 def _construct_gen_loader(cfg, split, mod):

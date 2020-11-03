@@ -108,9 +108,7 @@ def train_VAE(
     return loss_history
 
 
-def eval_VAE(
-    model, test_loader, test_modality, device, reparametrize_with_noise=True
-):
+def eval_VAE(model, test_loader, test_modality, device, reparametrize_with_noise=True):
     """
     Calculate zsl embeddings for given VAE model and data.
 
@@ -180,9 +178,7 @@ def compute_cada_losses(
 
     for modality in z_mu.keys():
         # Calculate reconstruction and kld loss for each modality
-        loss_recon += reconstruction_loss(
-            x[modality], x_recon[modality], **kwargs
-        )
+        loss_recon += reconstruction_loss(x[modality], x_recon[modality], **kwargs)
         loss_kld += (
             0.5
             * (
@@ -238,9 +234,7 @@ def compute_da_loss(z_mu_1, z_logvar_1, z_mu_2, z_logvar_2):
     """
 
     loss_mu = (z_mu_1 - z_mu_2).pow(2).sum(dim=1)
-    loss_var = (
-        ((z_logvar_1 / 2).exp() - (z_logvar_2 / 2).exp()).pow(2).sum(dim=1)
-    )
+    loss_var = ((z_logvar_1 / 2).exp() - (z_logvar_2 / 2).exp()).pow(2).sum(dim=1)
 
     loss_da = torch.sqrt(loss_mu + loss_var).mean()
 
@@ -295,13 +289,9 @@ def reconstruction_loss(x, x_recon, recon_loss_norm="l1", **kwargs):
         loss_recon: reconstruction loss.
     """
     if recon_loss_norm == "l1":
-        loss_recon = (
-            nn.functional.l1_loss(x, x_recon, reduction="sum") / x.shape[0]
-        )
+        loss_recon = nn.functional.l1_loss(x, x_recon, reduction="sum") / x.shape[0]
     elif recon_loss_norm == "l2":
-        loss_recon = (
-            nn.functional.mse_loss(x, x_recon, reduction="sum") / x.shape[0]
-        )
+        loss_recon = nn.functional.mse_loss(x, x_recon, reduction="sum") / x.shape[0]
 
     return loss_recon
 
@@ -367,7 +357,7 @@ def generate_synthetic_dataset(cfg, model):
     Generates synthetic dataset via trained zsl model to cls training
 
     Args:
-        cfg(dict): configs. Details can be found in
+        cfg(CfgNode): configs. Details can be found in
             zeroshoteval/config/defaults.py
         model: pretrained CADA-VAE model.
 
@@ -395,11 +385,11 @@ def generate_synthetic_dataset(cfg, model):
     zsl_emb_cls_attr, labels_cls_attr = eval_VAE(
         model, loader["train_attr_loader"], "CLS_ATTR", cfg.DEVICE
     )
-    if not cfg.GENERALIZED:
-        labels_cls_attr = remap_labels(
-            labels_cls_attr.cpu().numpy(), dataset.unseen_classes
-        )
-        labels_cls_attr = torch.from_numpy(labels_cls_attr)
+    # if not cfg.GENERALIZED:
+    #     labels_cls_attr = remap_labels(
+    #         labels_cls_attr.cpu().numpy(), dataset.unseen_classes
+    #     )
+    #     labels_cls_attr = torch.from_numpy(labels_cls_attr)
 
     # Generate zsl embeddings for test data
     zsl_emb_test, zsl_emb_labels_test = eval_VAE(
@@ -428,7 +418,12 @@ def generate_synthetic_dataset(cfg, model):
 
     zsl_emb_dataset = TensorDataset(zsl_emb, labels_tensor)
 
-    return zsl_emb_dataset, csl_train_indice, csl_test_indice
+    data = {
+        "dataset": zsl_emb_dataset,
+        "train_indicies": csl_train_indice,
+        "test_indicies": csl_test_indice,
+    }
+    return data
 
 
 def remap_labels(labels, classes):
@@ -448,7 +443,7 @@ def remap_labels(labels, classes):
 
 
 @ZSL_MODEL_REGISTRY.register()
-def CADA_VAE_train_procedure(cfg, dataset):
+def CADA_VAE_train_procedure(cfg):
     """
     Starts CADA-VAE model training and generates zsl_embedding dataset for
     classifier training.
@@ -456,7 +451,6 @@ def CADA_VAE_train_procedure(cfg, dataset):
     Args:
         cfg(CfgNode): configs. Details can be found in
             zeroshoteval/config/defaults.py
-        dataset(Dataset): dataset for training and evaluating.
 
     Returns:
         model: trained model.
@@ -478,14 +472,16 @@ def CADA_VAE_train_procedure(cfg, dataset):
     # Model training
     optimizer = build_optimizer(model, cfg, "ZSL")
 
-    train_loader = construct_loader(cfg, "trainval")
+    train_loader_with_extras = construct_loader(cfg, "trainval")
 
-    loss_history = train_VAE(
+    train_VAE(
         cfg=cfg,
         model=model,
-        train_loader=train_loader,
+        train_loader=train_loader_with_extras["loader"],
         optimizer=optimizer,
         recon_loss_norm=cfg.CADA_VAE.NORM_TYPE,
     )
+    data = {**generate_synthetic_dataset(cfg, model), **train_loader_with_extras}
+    del data["loader"]
 
-    return generate_synthetic_dataset(cfg, model)
+    return data
