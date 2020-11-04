@@ -110,6 +110,10 @@ _C.ZSL.EPOCH = 100
 # Training mini-batch size
 _C.ZSL.BATCH_SIZE = 128
 
+# Whether to save embediings or not
+_C.ZSL.SAVE_EMB = False
+
+
 # ---------------------------------------------------------------------------- #
 # Defines number of samples generated per class for each modality
 # ---------------------------------------------------------------------------- #
@@ -210,6 +214,8 @@ _C.CLS.SOLVER.OPTIMIZING_METHOD = "adam"
 # Data options
 # ---------------------------------------------------------------------------- #
 _C.DATA = CfgNode()
+
+_C.DATA.DATASET_NAME = "CUB"
 
 
 # ---------------------------------------------------------------------------- #

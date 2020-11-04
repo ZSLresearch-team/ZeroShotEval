@@ -1,15 +1,16 @@
-import itertools
-import logging
 import numpy as np
 import torch
 from torch import nn as nn
-from torch.utils.data import DataLoader, TensorDataset
-from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import TensorDataset
 
-from zeroshoteval.utils.misc import log_model_info
-from zeroshoteval.utils.optimizer_helper import build_optimizer
 from zeroshoteval.dataset.loader import construct_loader
 from zeroshoteval.dataset.loader_helper import build_gen_loaders
+from zeroshoteval.utils import checkpoint as cu
+from zeroshoteval.utils.misc import log_model_info
+from zeroshoteval.utils.optimizer_helper import build_optimizer
+
+import itertools
+import logging
 
 from ..build import ZSL_MODEL_REGISTRY
 from .cada_vae_model import VAEModel
@@ -18,12 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def train_VAE(
-    cfg,
-    model,
-    train_loader,
-    optimizer,
-    *args,
-    **kwargs,
+    cfg, model, train_loader, optimizer, *args, **kwargs,
 ):
     r"""
     Train VAE model.
@@ -100,7 +96,8 @@ def train_VAE(
         logger.info(
             f"Epoch: {epoch+1} "
             f"Loss: {loss_accum_mean:.1f} "
-            f"Loss vae: {loss_vae_accum}, loss ca: {loss_ca_accum} loss da: {loss_da_accum}"
+            f"Loss vae: {loss_vae_accum}, loss ca: {loss_ca_accum} "
+            f"loss da: {loss_da_accum}"
         )
 
         loss_history.append(loss_accum_mean)
@@ -108,7 +105,9 @@ def train_VAE(
     return loss_history
 
 
-def eval_VAE(model, test_loader, test_modality, device, reparametrize_with_noise=True):
+def eval_VAE(
+    model, test_loader, test_modality, device, reparametrize_with_noise=True
+):
     """
     Calculate zsl embeddings for given VAE model and data.
 
@@ -178,7 +177,9 @@ def compute_cada_losses(
 
     for modality in z_mu.keys():
         # Calculate reconstruction and kld loss for each modality
-        loss_recon += reconstruction_loss(x[modality], x_recon[modality], **kwargs)
+        loss_recon += reconstruction_loss(
+            x[modality], x_recon[modality], **kwargs
+        )
         loss_kld += (
             0.5
             * (
@@ -234,7 +235,9 @@ def compute_da_loss(z_mu_1, z_logvar_1, z_mu_2, z_logvar_2):
     """
 
     loss_mu = (z_mu_1 - z_mu_2).pow(2).sum(dim=1)
-    loss_var = ((z_logvar_1 / 2).exp() - (z_logvar_2 / 2).exp()).pow(2).sum(dim=1)
+    loss_var = (
+        ((z_logvar_1 / 2).exp() - (z_logvar_2 / 2).exp()).pow(2).sum(dim=1)
+    )
 
     loss_da = torch.sqrt(loss_mu + loss_var).mean()
 
@@ -289,9 +292,13 @@ def reconstruction_loss(x, x_recon, recon_loss_norm="l1", **kwargs):
         loss_recon: reconstruction loss.
     """
     if recon_loss_norm == "l1":
-        loss_recon = nn.functional.l1_loss(x, x_recon, reduction="sum") / x.shape[0]
+        loss_recon = (
+            nn.functional.l1_loss(x, x_recon, reduction="sum") / x.shape[0]
+        )
     elif recon_loss_norm == "l2":
-        loss_recon = nn.functional.mse_loss(x, x_recon, reduction="sum") / x.shape[0]
+        loss_recon = (
+            nn.functional.mse_loss(x, x_recon, reduction="sum") / x.shape[0]
+        )
 
     return loss_recon
 
@@ -453,7 +460,7 @@ def CADA_VAE_train_procedure(cfg):
             zeroshoteval/config/defaults.py
 
     Returns:
-        model: trained model.
+        data(dict): dictionary with zero-shot embeddings dataset and extra data.
 
     """
     logger.info("Building CADA-VAE model")
@@ -481,7 +488,14 @@ def CADA_VAE_train_procedure(cfg):
         optimizer=optimizer,
         recon_loss_norm=cfg.CADA_VAE.NORM_TYPE,
     )
-    data = {**generate_synthetic_dataset(cfg, model), **train_loader_with_extras}
+    data = {
+        **generate_synthetic_dataset(cfg, model),
+        **train_loader_with_extras,
+    }
     del data["loader"]
+
+    if cfg.ZSL.SAVE_EMB:
+        # Saving embeddings
+        cu.save_embeddings(cfg.OUTPUT_DIR, data, cfg)
 
     return data

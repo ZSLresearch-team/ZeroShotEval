@@ -2,8 +2,8 @@
 import torch
 
 from zeroshoteval.dataset.dataset import (
-    ObjEmbeddingDataset,
     GenEmbeddingDataset,
+    ObjEmbeddingDataset,
 )
 
 

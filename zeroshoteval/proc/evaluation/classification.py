@@ -161,12 +161,15 @@ def compute_mean_per_class_accuracies(
             labels_all = torch.cat((labels_all, y), 0)
             preds_all = torch.cat((preds_all, preds.long()), 0)
 
-    conf_matrix = confusion_matrix(labels_all.cpu().numpy(), preds_all.cpu().numpy())
+    conf_matrix = confusion_matrix(
+        labels_all.cpu().numpy(), preds_all.cpu().numpy()
+    )
     acc_seen = (
         np.diag(conf_matrix)[seen_classes] / conf_matrix.sum(1)[seen_classes]
     ).mean()
     acc_unseen = (
-        np.diag(conf_matrix)[unseen_classes] / conf_matrix.sum(1)[unseen_classes]
+        np.diag(conf_matrix)[unseen_classes]
+        / conf_matrix.sum(1)[unseen_classes]
     ).mean()
 
     if (acc_unseen < 1e-4) or (acc_seen < 1e-4):
@@ -178,8 +181,7 @@ def compute_mean_per_class_accuracies(
 
 
 def classification_procedure(
-    cfg,
-    data,
+    cfg, data,
 ):
     """
     Launches classifier training.

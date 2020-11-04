@@ -1,4 +1,3 @@
-from zeroshoteval.dataset.dataset import ObjEmbeddingDataset
 from zeroshoteval.proc.evaluation.classification import classification_procedure
 from zeroshoteval.proc.zeroshotnet.build import build_zsl
 
@@ -17,8 +16,7 @@ def experiment(cfg):
 
     # Final CLS
     classification_procedure(
-        cfg=cfg,
-        data=zsl_data,
+        cfg=cfg, data=zsl_data,
     )
 
     return None
