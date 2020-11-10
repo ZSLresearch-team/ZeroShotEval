@@ -228,7 +228,7 @@ _C.DATA.FEAT_EMB = CfgNode()
 
 
 # Path to feature embeddings
-_C.DATA.FEAT_EMB.PATH = "data/CUB/resnet101/"
+_C.DATA.FEAT_EMB.PATH = "datasets/CUB/resnet101/"
 
 
 _C.DATA.FEAT_EMB.DIM = CfgNode()

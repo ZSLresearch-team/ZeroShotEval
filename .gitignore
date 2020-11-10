@@ -108,7 +108,8 @@ venv.bak/
 *.code-workspace
 
 # Local storages
-data/*
+datasets/*
+!datasets/README.md
 models/*
 
 # Log files

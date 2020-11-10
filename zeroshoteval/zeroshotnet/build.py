@@ -18,6 +18,9 @@ def build_zsl(cfg):
     Args:
         cfg(CfgNode): configs. Details can be found in
             zeroshoteval/config/defaults.py
+
+    Returns:
+        Train procedure function to use for model training.
     """
     RNG_seed_setup(cfg)
 

@@ -1,6 +1,6 @@
 """Main script-launcher for evaliation of ZSL models
 """
-from zeroshoteval.proc.evaluation.classification import classification_procedure
+from zeroshoteval.evaluation.classification import classification_procedure
 
 import argparse
 from config import config

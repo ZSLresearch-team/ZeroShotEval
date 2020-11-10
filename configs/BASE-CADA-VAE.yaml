@@ -12,4 +12,4 @@ CLS:
     AMSGRAD: True
 DATA:
   FEAT_EMB:
-    PATH: "data/CUB/resnet101/"
+    PATH: "datasets/CUB/resnet101/"
