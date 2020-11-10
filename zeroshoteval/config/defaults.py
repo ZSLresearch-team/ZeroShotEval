@@ -128,7 +128,7 @@ _C.ZSL.SAMPLES_PER_CLASS.CLS_ATTR = 400
 _C.ZSL.SOLVER = CfgNode()
 
 # Base learning rate
-_C.ZSL.SOLVER.BASE_LR = 1e-3
+_C.ZSL.SOLVER.BASE_LR = 1e-3 #   1e-4 
 
 # Learning rate policy(not available now)
 _C.ZSL.SOLVER.LR_POLICY = ""
@@ -146,7 +146,7 @@ _C.ZSL.SOLVER.DAMPENING = 0.0
 _C.ZSL.SOLVER.NESTEROV = True
 
 # Betas - coefficients used for computing running averages
-_C.ZSL.SOLVER.BETAS = (0.9, 0.999)
+_C.ZSL.SOLVER.BETAS = (0.5, 0.999) #  (0.9, 0.999)
 
 # AMSGrad variant of Adam algorithms
 _C.ZSL.SOLVER.AMSGRAD = False
@@ -164,7 +164,7 @@ _C.ZSL.SOLVER.OPTIMIZING_METHOD = "adam"
 _C.CLS = CfgNode()
 
 # Number training epochs
-_C.CLS.EPOCH = 100
+_C.CLS.EPOCH = 20 #56
 
 # Training mini-batch size
 _C.CLS.BATCH_SIZE = 128
@@ -205,6 +205,8 @@ _C.CLS.SOLVER.WEIGHT_DECAY = 1e-4
 # Optimization method(only adam and sgd available for now)
 _C.CLS.SOLVER.OPTIMIZING_METHOD = "adam"
 
+# Ratio of part of test samples for retrainig classifier. (lisgan_classifier). 
+_C.CLS.RATIO = 0.6
 
 # ---------------------------------------------------------------------------- #
 # Data options
@@ -247,7 +249,7 @@ _C.DATA.TRAIN_CLS_NUM = 150
 # ---------------------------------------------------------------------------- #
 
 # ZSL model name
-_C.ZSL_MODEL_NAME = "CADA_VAE"
+_C.ZSL_MODEL_NAME = "LisGAN"  #  "CADA_VAE"
 
 # Output basedir.
 _C.OUTPUT_DIR = "."
@@ -276,7 +278,7 @@ _C.GENERALIZED = True
 _C.VERBOSE = 2
 
 # Device to use dor training
-_C.DEVICE = "cuda:0"
+_C.DEVICE = "cpu"#"cuda:0"
 
 
 # ---------------------------------------------------------------------------- #
@@ -320,18 +322,23 @@ _C.LISGAN.CLS_WEIGHT = 0.01
 _C.LISGAN.BETA = 10
 
 # Number samples in synthesis dataset to create synthesis soul samples.
-_C.LISGAN.NUM_SYNTH_SAMPLES
+_C.LISGAN.NUM_SYNTH_SAMPLES = 20
 
-# Number of synthesis samples unseen classes for classification daraset.
-_C.LISGAN.CLS_NUM_SAMPLES
+# Number of synthesis samples unseen classes for classification dataset.
+_C.LISGAN.CLS_NUM_SAMPLES = 300
 
 # Number epoch to train classifier.
-_C.config.LISGAN.CLASSIFIER_NUM_EPOCH = 100
+_C.LISGAN.CLASSIFIER_NUM_EPOCH = 100
+
+_C.LISGAN.HIDDEN_SIZE = CfgNode()
+
+# Encoders_hidden sizes
+_C.LISGAN.HIDDEN_SIZE.GENERATOR = 4096
+
+# Decoders hidden sizes
+_C.LISGAN.HIDDEN_SIZE.DISCRIMINATOR = 1024
 
 
-
-# Number of all classes.
-_C.CUB.NUM_CLASSES = 200
 
 
 def _assert_and_infer_cfg(cfg):

@@ -1,11 +1,11 @@
 import numpy as np
 import torch
 from torch import nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data.sampler import SubsetRandomSampler
-
-#from zeroshoteval.utils.misc import RNG_seed_setup, log_model_info
-#from zeroshoteval.utils.optimizer_helper import build_optimizer
+from scipy.stats import entropy
+from zeroshoteval.utils.misc import RNG_seed_setup, log_model_info
+from zeroshoteval.utils.optimizer_helper import build_optimizer
 
 import logging
 
@@ -78,7 +78,7 @@ def calculate_acc(true_label, pred_label, seen_classes, unseen_classes):
         acc_H = 2 * acc_seen * acc_unseen / (acc_seen + acc_unseen)
     return acc_seen, acc_unseen, acc_H
 
-    def train_classifier(classifier, optimizer, n_epoch, dataset, gzsl,
+def train_classifier(classifier, optimizer, n_epoch, dataset, gzsl,
           train_indices, test_indices, ratio, device, batch_size, seen_classes, 
           unseen_classes):
     """
@@ -153,7 +153,7 @@ def calculate_acc(true_label, pred_label, seen_classes, unseen_classes):
             f"Loss: {loss_accum_mean:.1f} Seen: {acc_seen:.2f} "
             f"Unseen: {acc_unseen:.2f} H: {acc_H:.2f}")
 
-            if acc_H > best_H:
+            if acc_H >= best_H:
                 best_H = acc_H
                 best_all_pred = pred_label
                 best_all_output = output_prob
@@ -162,13 +162,13 @@ def calculate_acc(true_label, pred_label, seen_classes, unseen_classes):
             f"Epoch: {_epoch+1} "
             f"Loss: {loss_accum_mean:.1f} Unseen: {acc_unseen:.2f} ")
 
-            if acc_unseen > best_acc_unseen:
+            if acc_unseen >= best_acc_unseen:
                 best_acc_unseen = acc_unseen
                 best_all_pred = pred_label
                 best_all_output = output_prob
 
-    test_easy_length = int(len(test_indexes) * ratio)
-    test_hard_length = len(test_indexes) - test_easy_length
+    test_easy_length = int(len(test_indices) * ratio)
+    test_hard_length = len(test_indices) - test_easy_length
     entropy_value = torch.Tensor(list(map(entropy, best_all_output.cpu())))
     indices = torch.sort(-entropy_value)[1]
     exit_indices = indices[:test_easy_length]
@@ -197,15 +197,15 @@ def calculate_acc(true_label, pred_label, seen_classes, unseen_classes):
             f"Easy score Unseen: {acc_unseen_easy:.2f} "
             f"Hard score Unseen: {acc_unseen_hard:.2f} ")
 
-    train_features  = dataset.tensors[0][train_indexes]
-    train_labels =  dataset.tensors[1][train_indexes]
+    train_features  = dataset.tensors[0][train_indices]
+    train_labels =  dataset.tensors[1][train_indices]
     extended_features = torch.cat((train_features, 
                                    all_test_feature[exit_indices]), 0)
     extended_labels = torch.cat((train_labels, best_easy_label), 0)
     extended_dataset = TensorDataset(extended_features, extended_labels)
-    hard_test_loader = DataLoader(dataset_classifier, 
+    hard_test_loader = DataLoader(dataset, 
                                   batch_size=batch_size,
-                                  sampler=test_indexes[keep_indices])
+                                  sampler=test_indices[keep_indices])
 
     loss_hist = []
     acc_unseen_hist = []
@@ -255,7 +255,7 @@ def calculate_acc(true_label, pred_label, seen_classes, unseen_classes):
             f"Loss: {loss_accum_mean:.1f} Seen: {hard_acc_seen:.2f} "
             f"Unseen: {hard_acc_unseen:.2f} H: {hard_acc_H:.2f}")
 
-            if hard_acc_H > best_hard_H:
+            if hard_acc_H >= best_hard_H:
                 best_hard_H = hard_acc_H
                 best_hard_pred = hard_pred_label
                 best_hard_labels = hard_true_label
@@ -264,7 +264,7 @@ def calculate_acc(true_label, pred_label, seen_classes, unseen_classes):
             f"Epoch: {_epoch+1} "
             f"Loss: {loss_accum_mean:.1f} Unseen: {hard_acc_unseen:.2f} ")
 
-            if hard_acc_unseen > best_acc_unseen:
+            if hard_acc_unseen >= best_acc_unseen:
                 best_acc_unseen = hard_acc_unseen
                 best_hard_pred = hard_pred_label
                 best_hard_labels = hard_true_label
@@ -342,21 +342,21 @@ def classification_procedure(
         acc_H_hist(list): harmonic mean of seen and unseen accuracies.
     """
 
-    #RNG_seed_setup(cfg)
+    RNG_seed_setup(cfg)
     logger.info("Building final lisgan-classifier model")
     classifier = SoftmaxClassifier(in_features, num_classes)
     classifier.to(cfg.DEVICE)
-    classifier = classifier.double()
-    #log_model_info(classifier, "Final Classifier")
+    classifier = classifier.float()
+    log_model_info(classifier, "Final Classifier")
 
-    #optimizer = build_optimizer(classifier, cfg, "CLS")
-    optimizer = optim.Adam(classifier.parameters(), lr=0.001, betas=(0.5, 0.999))
+    optimizer = build_optimizer(classifier, cfg, "CLS")
+    #optimizer = optim.Adam(classifier.parameters(), lr=0.001, betas=(0.5, 0.999))
 
     acc_seen_hist, acc_unseen_hist, acc_H_hist = train_classifier(classifier, 
                                                                   optimizer, 
                                                                   cfg.CLS.EPOCH,
                                                                   data, 
-                                                                  cfg.GZSL, 
+                                                                  cfg.GENERALIZED, 
                                                                   train_indicies, 
                                                                   test_indicies, 
                                                                   cfg.CLS.RATIO,
