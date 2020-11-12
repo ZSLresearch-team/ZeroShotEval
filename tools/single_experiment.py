@@ -15,8 +15,6 @@ def experiment(cfg):
     zsl_data = build_zsl(cfg)(cfg)
 
     # Final CLS
-    classification_procedure(
-        cfg=cfg, data=zsl_data,
-    )
+    classification_procedure(cfg=cfg, data=None)
 
     return None

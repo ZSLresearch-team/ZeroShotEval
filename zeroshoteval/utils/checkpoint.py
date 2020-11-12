@@ -5,6 +5,9 @@ import torch
 from fvcore.common.file_io import PathManager
 
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_embeddings_dir(path_to_job):
@@ -32,20 +35,37 @@ def get_path_to_data(path_to_job, cfg):
 
 def save_embeddings(path_to_job, data, cfg):
     """
-    Save a checkpoint.
+    Save embeddings.
 
     Args:
         model (model): model to save the weight to the checkpoint.
         data (dict): dictionary with embeddings dataset and extra data.
         cfg (CfgNode): configs to save.
     """
-    # Ensure that the checkpoint dir exists.
+    # Ensure that the save dir exists.
     PathManager.mkdirs(get_embeddings_dir(path_to_job))
 
     # Record the state.
     data["cfg"] = {"cfg": cfg.dump()}
-    # Write the checkpoint.
+    # Write the data.
     path_to_data = get_path_to_data(path_to_job, cfg)
+    logger.info(f"Save embeddings and extra data to {path_to_data}")
     with PathManager.open(path_to_data, "wb") as f:
         torch.save(data, f)
     return path_to_data
+
+
+def load_embeddings(cfg):
+    """
+    Load embeddings.
+
+    Args:
+        cfg (CfgNode): configs. Details can be found in
+            zeroshoteval/config/defaults.py.
+    """
+
+    logger.info(f"Loadding embeddings and extra data from ")
+    # Load the data.
+    with PathManager.open(cfg.DATA.ZSL_EMB.PATH, "rb") as f:
+        data = torch.load(f, map_location="cpu")
+    return data

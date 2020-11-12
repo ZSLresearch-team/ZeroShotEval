@@ -173,6 +173,9 @@ _C.CLS.EPOCH = 100
 # Training mini-batch size
 _C.CLS.BATCH_SIZE = 128
 
+# Load emveddings data from file
+_C.CLS.LOAD_DATA = False
+
 
 # ---------------------------------------------------------------------------- #
 # Clasifier solver options
@@ -244,6 +247,14 @@ _C.DATA.FEAT_EMB.DIM.IMG = 2048
 
 
 _C.DATA.FEAT_EMB.DIM.CLS_ATTR = 312
+
+
+# ---------------------------------------------------------------------------- #
+# ZSL embeddings options
+# ---------------------------------------------------------------------------- #
+_C.DATA.ZSL_EMB = CfgNode()
+
+_C.DATA.ZSL_EMB.PATH = ""
 
 
 # ---------------------------------------------------------------------------- #
