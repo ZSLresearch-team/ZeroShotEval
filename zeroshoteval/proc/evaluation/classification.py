@@ -178,7 +178,7 @@ def compute_mean_per_class_accuracies(
     return acc_seen, acc_unseen, acc_H
 
 
-def classification_procedure(cfg, data):
+def classification_procedure(cfg, data=None):
     """
     Launches classifier training.
 
