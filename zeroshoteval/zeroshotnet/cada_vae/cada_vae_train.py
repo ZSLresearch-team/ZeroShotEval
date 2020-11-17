@@ -42,6 +42,8 @@ def CADA_VAE_train_procedure(
 
     """
     logger.info("Building CADA-VAE model")
+
+    # Model building
     model = VAEModel(
         hidden_size_encoder=cfg.CADA_VAE.HIDDEN_SIZE.ENCODER,
         hidden_size_decoder=cfg.CADA_VAE.HIDDEN_SIZE.DECODER,
@@ -55,9 +57,10 @@ def CADA_VAE_train_procedure(
     model.to(cfg.DEVICE)
     log_model_info(model, cfg.ZSL_MODEL_NAME)
 
-    # Model training
+    # Optimizer building
     optimizer = build_optimizer(model, cfg, "ZSL")
 
+    # Data loader building
     train_sampler = SubsetRandomSampler(dataset.train_indices)
     train_loader = DataLoader(
         dataset,
@@ -68,6 +71,7 @@ def CADA_VAE_train_procedure(
         pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
     )
 
+    # Model training
     trainer = CadaVaeTrainer(model=model,
                              data_loader=train_loader,
                              optimizer=optimizer,
@@ -75,6 +79,7 @@ def CADA_VAE_train_procedure(
 
     trainer.train(max_iter=cfg.ZSL.EPOCH)
 
+    # Post-training actions
     if save_model:
         # TODO: implement model saving
         raise NotImplementedError("Model saving is not implemented!")
@@ -132,6 +137,7 @@ class CadaVaeTrainer(TrainerBase):
             self.__calculate_loss_factors(self.current_iter, self.cfg.CADA_VAE.WARMUP)
         )
 
+        # TODO: move the cycle below to the run_step separately
         for _i_step, (x, _) in enumerate(self.data_loader):
 
             for modality, modality_tensor in x.items():

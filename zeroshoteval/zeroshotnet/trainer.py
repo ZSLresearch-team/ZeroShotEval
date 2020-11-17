@@ -24,6 +24,8 @@ class TrainerBase:
 
         # NOTE: One can easily define any kind of train hooks here.
 
+        # TODO: define simple hooks, e.g. save_model
+
         # We set the model to training mode in the trainer.
         # However it's valid to train a model that's in eval mode.
         # If you want your model (or a submodule of it) to behave
