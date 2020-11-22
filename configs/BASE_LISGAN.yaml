@@ -1,0 +1,19 @@
+ZSL_MODEL_NAME: "LisGAN"
+ZSL:
+  BATCH_SIZE: 64
+  EPOCH: 56
+  SOLVER:
+    BASE_LR: 0.0001
+    BETAS:
+    - 0.5
+    - 0.999
+CLS:
+  EPOCH: 20
+  BATCH_SIZE: 64
+  SOLVER:
+    BETAS:
+      - 0.5
+      - 0.999
+DATA:
+  FEAT_EMB:
+    PATH: "data/CUB/resnet101/"

@@ -128,7 +128,7 @@ _C.ZSL.SAMPLES_PER_CLASS.CLS_ATTR = 400
 _C.ZSL.SOLVER = CfgNode()
 
 # Base learning rate
-_C.ZSL.SOLVER.BASE_LR = 1e-3
+_C.ZSL.SOLVER.BASE_LR = 1e-3 #   1e-4 
 
 # Learning rate policy(not available now)
 _C.ZSL.SOLVER.LR_POLICY = ""
@@ -146,7 +146,7 @@ _C.ZSL.SOLVER.DAMPENING = 0.0
 _C.ZSL.SOLVER.NESTEROV = True
 
 # Betas - coefficients used for computing running averages
-_C.ZSL.SOLVER.BETAS = (0.9, 0.999)
+_C.ZSL.SOLVER.BETAS = (0.5, 0.999) #  (0.9, 0.999)
 
 # AMSGrad variant of Adam algorithms
 _C.ZSL.SOLVER.AMSGRAD = False
@@ -164,7 +164,7 @@ _C.ZSL.SOLVER.OPTIMIZING_METHOD = "adam"
 _C.CLS = CfgNode()
 
 # Number training epochs
-_C.CLS.EPOCH = 100
+_C.CLS.EPOCH = 20 #56
 
 # Training mini-batch size
 _C.CLS.BATCH_SIZE = 128
@@ -205,6 +205,8 @@ _C.CLS.SOLVER.WEIGHT_DECAY = 1e-4
 # Optimization method(only adam and sgd available for now)
 _C.CLS.SOLVER.OPTIMIZING_METHOD = "adam"
 
+# Ratio of part of test samples for retrainig classifier. (lisgan_classifier). 
+_C.CLS.RATIO = 0.6
 
 # ---------------------------------------------------------------------------- #
 # Data options
@@ -239,13 +241,15 @@ _C.DATA.FEAT_EMB.DIM.IMG = 2048
 
 _C.DATA.FEAT_EMB.DIM.CLS_ATTR = 312
 
+_C.DATA.NUM_CLASSES = 200
 
+_C.DATA.TRAIN_CLS_NUM = 150
 # ---------------------------------------------------------------------------- #
 # Misc options
 # ---------------------------------------------------------------------------- #
 
 # ZSL model name
-_C.ZSL_MODEL_NAME = "CADA_VAE"
+_C.ZSL_MODEL_NAME = "LisGAN"  #  "CADA_VAE"
 
 # Output basedir.
 _C.OUTPUT_DIR = "."
@@ -274,7 +278,7 @@ _C.GENERALIZED = True
 _C.VERBOSE = 2
 
 # Device to use dor training
-_C.DEVICE = "cuda:0"
+_C.DEVICE = "cpu"#"cuda:0"
 
 
 # ---------------------------------------------------------------------------- #
@@ -290,6 +294,51 @@ _C.DATA_LOADER.PIN_MEMORY = True
 
 # Drop last mini-batch
 _C.DATA_LOADER.DROP_LAST = True
+
+# ---------------------------------------------------------------------------- #
+# LISGAN model options
+# ---------------------------------------------------------------------------- #
+_C.LISGAN = CfgNode()
+
+# Number clusters(soul samples) during train.
+_C.LISGAN.N_CLUSTER = 3
+
+# Dimention of noise
+_C.LISGAN.NOISE_SIZE = 312
+
+# Number of iterations discriminator training.
+_C.LISGAN.TRAIN_DISCRIMINATOR_NUM_ITER = 5
+
+# Coeficent for first regularisation term. 
+_C.LISGAN.REG1_COEF = 0.01
+
+# Coeficent for second regularisation term. 
+_C.LISGAN.REG2_COEF = 0.001
+
+# Weight for classification loss term in generator loss.
+_C.LISGAN.CLS_WEIGHT = 0.01
+
+# Coeficent of gradient penatlty addictor.
+_C.LISGAN.BETA = 10
+
+# Number samples in synthesis dataset to create synthesis soul samples.
+_C.LISGAN.NUM_SYNTH_SAMPLES = 20
+
+# Number of synthesis samples unseen classes for classification dataset.
+_C.LISGAN.CLS_NUM_SAMPLES = 300
+
+# Number epoch to train classifier.
+_C.LISGAN.CLASSIFIER_NUM_EPOCH = 100
+
+_C.LISGAN.HIDDEN_SIZE = CfgNode()
+
+# Encoders_hidden sizes
+_C.LISGAN.HIDDEN_SIZE.GENERATOR = 4096
+
+# Decoders hidden sizes
+_C.LISGAN.HIDDEN_SIZE.DISCRIMINATOR = 1024
+
+
 
 
 def _assert_and_infer_cfg(cfg):
