@@ -15,37 +15,25 @@ https://www.dropbox.com/sh/btoc495ytfbnbat/AAAaurkoKnnk0uV-swgF-gdSa?dl=0
 In other case you will catch a lot of errors!
 """
 
+import argparse
+import os
+import pickle
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy import io as sio
 from sklearn import preprocessing
 
-# region IMPORTS
-import argparse
-import json
-import os
-import pickle
-from pathlib import Path
-
-# endregion
-
 
 def init_arguments():
-    parser = argparse.ArgumentParser(
-        description="Script for embeddings transformation to pickle file"
-    )
-    parser.add_argument(
-        "--dataset", required=True, help="Name of the dataset to transform."
-    )
-    parser.add_argument(
-        "--path", required=True, help="Path to the dataset to transform."
-    )
-    parser.add_argument(
-        "--output-dir",
-        required=True,
-        help="Path to the output directory where the transformed \
-                            embeddings will be saved.",
-    )
+    parser = argparse.ArgumentParser(description="Script for embeddings transformation to pickle file")
+    parser.add_argument("--dataset", required=True,
+                        help="Name of the dataset to transform.")
+    parser.add_argument("--path", required=True,
+                        help="Path to the dataset to transform.")
+    parser.add_argument("--output-dir", required=True,
+                        help="Path to the output directory where the transformed embeddings will be saved.")
     return parser
 
 
@@ -106,7 +94,7 @@ def read_data_splits(matattrsplit_file, root_path):
     # val_unseen_loc = matattrsplit['val_loc'].squeeze() - 1  #--> test_unseen_feature = TEST UNSEEN
 
     for part, params in zip(
-        (trainval_loc, test_seen_loc, test_unseen_loc), ((1, 1), (0, 1), (0, 0))
+            (trainval_loc, test_seen_loc, test_unseen_loc), ((1, 1), (0, 1), (0, 0))
     ):
         part_df = pd.DataFrame(columns=splits_df.columns)
         part_df.loc[:, "obj_id"] = np.sort(part)
@@ -125,12 +113,7 @@ def preprocess_data(data):
     return scaler.fit_transform(data)
 
 
-def load_dataset_embeddings(
-    dataset_name,
-    path,
-    matdata_file="res101.mat",
-    matattrsplit_file="att_splits.mat",
-):
+def load_dataset_embeddings(dataset_name, path, matdata_file="res101.mat", matattrsplit_file="att_splits.mat"):
     """Loads specified dataset to dictionary structure 
     for further saving to pickle file.
     """
@@ -154,9 +137,7 @@ def load_dataset_embeddings(
 
     img_embeddings, labels = read_matdataset(matdata_file, root_path=path)
 
-    aux_modalities_embeddings = read_matattributes(
-        matattrsplit_file, root_path=path, dataset=dataset_name
-    )
+    aux_modalities_embeddings = read_matattributes(matattrsplit_file, root_path=path, dataset=dataset_name)
     splits_df = read_data_splits(matattrsplit_file, root_path=path)
 
     embeddings_dict = {**img_embeddings, **aux_modalities_embeddings}
@@ -191,14 +172,6 @@ def save_data(embeddings, labels, splits_df, dataset_name, save_dir):
 
 if __name__ == "__main__":
     args = load_arguments()
-    embeddings, labels, splits_df = load_dataset_embeddings(
-        dataset_name=args.dataset, path=args.path
-    )
+    embeddings, labels, splits_df = load_dataset_embeddings(dataset_name=args.dataset, path=args.path)
 
-    save_data(
-        embeddings,
-        labels,
-        splits_df,
-        dataset_name=args.dataset,
-        save_dir=args.output_dir,
-    )
+    save_data(embeddings, labels, splits_df, dataset_name=args.dataset, save_dir=args.output_dir)

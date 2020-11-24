@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from os import PathLike
 
-from ._types import EmbeddingObject, ExtractorType, SourceObject
+from zeroshoteval.utils.types import EmbeddingObject, ExtractorType, SourceObject
 
 
 class EmbeddingExtractor(metaclass=ABCMeta):

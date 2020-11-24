@@ -5,15 +5,15 @@ from torch import nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from zeroshoteval.zeroshotnet.trainer import TrainerBase
+from zeroshoteval.models.trainer_base import TrainerBase
 
 from zeroshoteval.utils.misc import log_model_info
-from zeroshoteval.utils.optimizer_helper import build_optimizer
+from zeroshoteval.solver.optimizer_helper import build_optimizer
 
 import itertools
 import logging
 
-from ..build import ZSL_MODEL_REGISTRY
+from zeroshoteval.models.build import ZSL_MODEL_REGISTRY
 from .cada_vae_model import VAEModel
 
 

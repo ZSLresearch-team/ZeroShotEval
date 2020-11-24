@@ -1,3 +1,0 @@
-# Utilities
-
-Useful auxiliary scripts.

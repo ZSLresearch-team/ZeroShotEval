@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from zeroshoteval.utils.misc import RNG_seed_setup, log_model_info
-from zeroshoteval.utils.optimizer_helper import build_optimizer
+from zeroshoteval.solver.optimizer_helper import build_optimizer
 
 import logging
 

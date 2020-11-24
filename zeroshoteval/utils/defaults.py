@@ -1,4 +1,6 @@
 from fvcore.common.file_io import PathManager
+from fvcore.common.config import CfgNode
+from argparse import Namespace
 
 from zeroshoteval.utils.collect_env import collect_env_info
 from zeroshoteval.utils.logger import setup_logger
@@ -6,7 +8,7 @@ from zeroshoteval.utils.logger import setup_logger
 import os
 
 
-def default_setup(cfg, args):
+def default_setup(cfg: CfgNode, args: Namespace) -> None:
     """
     Perform some basic common setups at the beginning of a job, including:
     1. Set up the zeroshoteval logger

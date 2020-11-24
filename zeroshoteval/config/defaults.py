@@ -292,7 +292,7 @@ _C.DATA_LOADER.PIN_MEMORY = True
 _C.DATA_LOADER.DROP_LAST = True
 
 
-def _assert_and_infer_cfg(cfg):
+def _assert_and_infer_cfg(cfg: CfgNode) -> CfgNode:
     # CADA-VAE assertions
     assert cfg.CADA_VAE.NORM_TYPE in ["l1", "l2"]
 
@@ -305,7 +305,7 @@ def _assert_and_infer_cfg(cfg):
     return cfg
 
 
-def get_cfg():
+def get_cfg() -> CfgNode:
     """
     Get a copy of the default config.
     """

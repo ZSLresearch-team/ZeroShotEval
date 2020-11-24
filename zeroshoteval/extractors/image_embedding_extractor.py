@@ -7,9 +7,9 @@ from torchvision.models.resnet import resnet101
 from logging import getLogger
 from typing import Optional
 
-from .base_classes._types import EmbeddingObject, ExtractorType, ImageObject
-from .base_classes.base import EmbeddingExtractor
-from .base_classes.exceptions import ExtractorTypeError
+from zeroshoteval.utils.types import EmbeddingObject, ExtractorType, ImageObject
+from zeroshoteval.extractors.extractor_base import EmbeddingExtractor
+from zeroshoteval.utils.exceptions import ExtractorTypeError
 
 
 class ImageEmbeddingExtractor(EmbeddingExtractor):

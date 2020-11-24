@@ -1,6 +1,7 @@
 from torch import nn as nn
 
-from .vae_networks import DecoderTemplate, EncoderTemplate
+from zeroshoteval.layers.vae_encoder import EncoderTemplate
+from zeroshoteval.layers.vae_decoder import DecoderTemplate
 
 
 class VAEModel(nn.Module):
