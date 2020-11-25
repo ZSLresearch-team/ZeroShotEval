@@ -99,7 +99,6 @@ class ObjEmbeddingDataset(Dataset):
         self.test_seen_indices = att_splits["test_seen_loc"].squeeze() - 1
         self.test_unseen_indices = att_splits["test_unseen_loc"].squeeze() - 1
         self.test_indices = None
-        self.la = labels
         # numpy array index starts from 0, matlab starts from 1
         if self.split in ["trainval"]:
             indices = (
@@ -183,7 +182,8 @@ class GenEmbeddingDataset(Dataset):
                 seen_classes = np.unique(labels[train_indices])
                 for label in seen_classes:
                     class_indices = np.intersect1d(
-                        np.sort(train_indices), np.where(labels == label),
+                        np.sort(train_indices),
+                        np.where(labels == label),
                     )
                     class_indices = np.resize(
                         class_indices, self.samples_per_class.IMG

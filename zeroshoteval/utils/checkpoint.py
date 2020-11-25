@@ -46,7 +46,7 @@ def save_embeddings(path_to_job, data, cfg):
     PathManager.mkdirs(get_embeddings_dir(path_to_job))
 
     # Record the state.
-    data["cfg"] = {"cfg": cfg.dump()}
+    data["cfg"] = cfg.dump()
     # Write the data.
     path_to_data = get_path_to_data(path_to_job, cfg)
     logger.info(f"Save embeddings and extra data to {path_to_data}")

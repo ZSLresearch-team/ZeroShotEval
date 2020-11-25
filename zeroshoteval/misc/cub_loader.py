@@ -70,10 +70,12 @@ def CUB_loader(path=""):
     )
 
     train_frame = pd.DataFrame(
-        [], columns=["image", "class", *list(attributes[0])],
+        [],
+        columns=["image", "class", *list(attributes[0])],
     )
     test_frame = pd.DataFrame(
-        [], columns=["image", "class", *list(attributes[0])],
+        [],
+        columns=["image", "class", *list(attributes[0])],
     )
 
     count = 0
@@ -82,7 +84,8 @@ def CUB_loader(path=""):
         image = Image.open(path_file)
 
         example = pd.DataFrame(
-            [], columns=["image", "class", *list(attributes[0])],
+            [],
+            columns=["image", "class", *list(attributes[0])],
         )
         example["image"] = [image]
         example["class"] = [file[4 : file.find("/")]]

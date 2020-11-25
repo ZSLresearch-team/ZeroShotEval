@@ -19,7 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 def train_VAE(
-    cfg, model, train_loader, optimizer, *args, **kwargs,
+    cfg,
+    model,
+    train_loader,
+    optimizer,
+    *args,
+    **kwargs,
 ):
     r"""
     Train VAE model.
