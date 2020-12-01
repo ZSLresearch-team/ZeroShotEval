@@ -35,6 +35,7 @@ setup(
         "tensorboard",
         "pandas",
         "simplejson",
+        "psutil",
     ],
     python_requires=">=3.6",
     extras_require={

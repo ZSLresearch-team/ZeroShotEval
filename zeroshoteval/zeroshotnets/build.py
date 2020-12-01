@@ -5,7 +5,7 @@ from zeroshoteval.utils.misc import RNG_seed_setup
 ZSL_MODEL_REGISTRY = Registry("DATASET")
 ZSL_MODEL_REGISTRY.__doc__ = """
 Registry for Zero-shot model.
-The registered object will be called with `obj(cfg, dataset)`.
+The registered object will be called with `obj(cfg)`.
 
 """
 

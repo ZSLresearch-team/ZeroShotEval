@@ -24,17 +24,17 @@ from PIL import Image, ImageDraw
 
 def CUB_loader(path=""):
     """unpacked CUB dataset loader
-     source for dataset http://www.vision.caltech.edu/visipedia/CUB-200-2011.html
-      Parameters
-      ----------
-      path_folder : str
-          The location of unpaked folder CUB_200_2011
-          (if None then location is work dirrectory)
-      Returns
-      -------
-      pandas DataFrame
-          a dataframe 1 column PIL image, second str name of class
-      """
+    source for dataset http://www.vision.caltech.edu/visipedia/CUB-200-2011.html
+     Parameters
+     ----------
+     path_folder : str
+         The location of unpaked folder CUB_200_2011
+         (if None then location is work dirrectory)
+     Returns
+     -------
+     pandas DataFrame
+         a dataframe 1 column PIL image, second str name of class
+    """
     if path == "":
         path = os.path.join(os.getcwd(), "CUB_200")
 
@@ -70,10 +70,12 @@ def CUB_loader(path=""):
     )
 
     train_frame = pd.DataFrame(
-        [], columns=["image", "class", *list(attributes[0])],
+        [],
+        columns=["image", "class", *list(attributes[0])],
     )
     test_frame = pd.DataFrame(
-        [], columns=["image", "class", *list(attributes[0])],
+        [],
+        columns=["image", "class", *list(attributes[0])],
     )
 
     count = 0
@@ -82,7 +84,8 @@ def CUB_loader(path=""):
         image = Image.open(path_file)
 
         example = pd.DataFrame(
-            [], columns=["image", "class", *list(attributes[0])],
+            [],
+            columns=["image", "class", *list(attributes[0])],
         )
         example["image"] = [image]
         example["class"] = [file[4 : file.find("/")]]
