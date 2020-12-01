@@ -9,6 +9,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 from zeroshoteval.utils.misc import RNG_seed_setup, log_model_info
 from zeroshoteval.utils.optimizer_helper import build_optimizer
+from zeroshoteval.utils.checkpoint import load_embeddings
 
 import logging
 
@@ -59,7 +60,6 @@ def train_cls(
     unseen_classes,
     train_loader,
     test_loader,
-    verbose=1,
 ):
     """
     Train Softmax classifier model
@@ -74,8 +74,6 @@ def train_cls(
         train_loader: loaer of the train data.
         test_seen_loader: loader of the test seen data.
         test_unseen_loader: loader of the test unseen data.
-        verbose: boolean or Int. The higher value verbose is -
-            the more info will you get.
 
     Returns:
         loss_hist(list): train loss history.
@@ -183,29 +181,14 @@ def compute_mean_per_class_accuracies(
     return acc_seen, acc_unseen, acc_H
 
 
-def classification_procedure(
-    cfg,
-    data,
-    in_features,
-    num_classes,
-    train_indicies,
-    test_indicies,
-    seen_classes,
-    unseen_classes,
-):
+def classification_procedure(cfg, data=None):
     """
     Launches classifier training.
 
     Args:
         cfg(CfgNode): configs. Details can be found in
             zeroshoteval/config/defaults.py
-        data(Dataset): torch tensor dataset for ZSL embeddings.
-        in_features(int): number of input features.
-        num_classes(int): number of classes.
-        train_indicies: indicies of training data.
-        test_indices: inicies of testing data.
-        seen_classes(numpy array): labels of seen classes.
-        unseen_classes(numpy array): labels of unseen classes.
+        data(dict): dictionary with zsl dataset and another extra data.
 
     Returns:
         loss_hist(list): train loss history.
@@ -213,21 +196,28 @@ def classification_procedure(
         acc_unseen_hist(list): accuracy for unseen classes.
         acc_H_hist(list): harmonic mean of seen and unseen accuracies.
     """
-
     RNG_seed_setup(cfg)
+
+    if cfg.CLS.LOAD_DATA:
+        data = load_embeddings(cfg)
+
+    assert (data is not None, logger.error("Data neighter loaded nor passed"))
+
     logger.info("Building final classifier model")
-    classifier = SoftmaxClassifier(in_features, num_classes)
+    classifier = SoftmaxClassifier(
+        data["dataset"].tensors[0].size(1), data["num_classes"]
+    )
     classifier.to(cfg.DEVICE)
     log_model_info(classifier, "Final Classifier")
 
-    train_sampler = SubsetRandomSampler(train_indicies)
-    test_sampler = SubsetRandomSampler(test_indicies)
+    train_sampler = SubsetRandomSampler(data["train_indicies"])
+    test_sampler = SubsetRandomSampler(data["test_indicies"])
 
     train_loader = DataLoader(
-        data, batch_size=cfg.CLS.BATCH_SIZE, sampler=train_sampler
+        data["dataset"], batch_size=cfg.CLS.BATCH_SIZE, sampler=train_sampler
     )
     test_loader = DataLoader(
-        data, batch_size=cfg.CLS.BATCH_SIZE, sampler=test_sampler
+        data["dataset"], batch_size=cfg.CLS.BATCH_SIZE, sampler=test_sampler
     )
 
     optimizer = build_optimizer(classifier, cfg, "CLS")
@@ -237,12 +227,11 @@ def classification_procedure(
         optimizer,
         cfg.DEVICE,
         cfg.CLS.EPOCH,
-        num_classes,
-        seen_classes,
-        unseen_classes,
+        data["num_classes"],
+        data["seen_classes"],
+        data["unseen_classes"],
         train_loader,
         test_loader,
-        verbose=cfg.VERBOSE,
     )
 
     best_H_idx = acc_H_hist.index(max(acc_H_hist))

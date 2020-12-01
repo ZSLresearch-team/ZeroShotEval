@@ -13,9 +13,9 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 class CLSWGAN:
     def __init__(self, _seenclasses, _epochCount=1, _critic_iter=1):
         """
-            _epochCount (nepoch): number of epochs to train for
-            _critic_iter: critic iteration, following WGAN-GP
-            _seenclasses: count of seen class
+        _epochCount (nepoch): number of epochs to train for
+        _critic_iter: critic iteration, following WGAN-GP
+        _seenclasses: count of seen class
         """
         self.epochCount = _epochCount
         self.critic_iter = _critic_iter
@@ -28,11 +28,11 @@ class CLSWGAN:
         self, batch_size=64, resSize=2048, attSize=312, nz=312, _beta1=0.5
     ):
         """
-            batch_size: input batch size
-            resSize: size of visual features
-            attSize: size of semantic features
-            nz: size of the latent z vector          
-            _beta1: beta1 for adam. default=0.5
+        batch_size: input batch size
+        resSize: size of visual features
+        attSize: size of semantic features
+        nz: size of the latent z vector
+        _beta1: beta1 for adam. default=0.5
         """
         self.batch_size = batch_size
         self.resSize = resSize
@@ -207,7 +207,7 @@ class CLSWGAN:
             ntrain: количество тренировочных данных
             _lambda1: gradient penalty regularizer, following WGAN-GP
             _cls_weight: weight of the classification loss
-            _lr: learning rate to train GANs 
+            _lr: learning rate to train GANs
             _beta1: beta1 for adam. default=0.5
             classifier_checkpoint: tells which ckpt file of tensorflow model to load
             logdir: folder to output and help print losses
@@ -337,7 +337,7 @@ class CLSWGAN:
         self, attribute, generateDir="src/zeroshot_networks/gan_net/result/"
     ):
         """
-            attribute: txt attribute matrix for all classes [txtEmb.length() * nclass]
+        attribute: txt attribute matrix for all classes [txtEmb.length() * nclass]
         """
 
         syn_res = np.empty((0, self.resSize), np.float32)

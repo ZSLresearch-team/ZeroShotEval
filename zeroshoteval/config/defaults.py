@@ -110,6 +110,10 @@ _C.ZSL.EPOCH = 100
 # Training mini-batch size
 _C.ZSL.BATCH_SIZE = 128
 
+# Whether to save embediings or not
+_C.ZSL.SAVE_EMB = False
+
+
 # ---------------------------------------------------------------------------- #
 # Defines number of samples generated per class for each modality
 # ---------------------------------------------------------------------------- #
@@ -169,6 +173,9 @@ _C.CLS.EPOCH = 100
 # Training mini-batch size
 _C.CLS.BATCH_SIZE = 128
 
+# Load emveddings data from file
+_C.CLS.LOAD_DATA = False
+
 
 # ---------------------------------------------------------------------------- #
 # Clasifier solver options
@@ -211,6 +218,8 @@ _C.CLS.SOLVER.OPTIMIZING_METHOD = "adam"
 # ---------------------------------------------------------------------------- #
 _C.DATA = CfgNode()
 
+_C.DATA.DATASET_NAME = "CUB"
+
 
 # ---------------------------------------------------------------------------- #
 # Original data options
@@ -238,6 +247,14 @@ _C.DATA.FEAT_EMB.DIM.IMG = 2048
 
 
 _C.DATA.FEAT_EMB.DIM.CLS_ATTR = 312
+
+
+# ---------------------------------------------------------------------------- #
+# ZSL embeddings options
+# ---------------------------------------------------------------------------- #
+_C.DATA.ZSL_EMB = CfgNode()
+
+_C.DATA.ZSL_EMB.PATH = ""
 
 
 # ---------------------------------------------------------------------------- #
@@ -269,9 +286,6 @@ _C.NUM_SHOTS = 0
 
 # If True GZSL mode, else ZSL
 _C.GENERALIZED = True
-
-# Verbosity option
-_C.VERBOSE = 2
 
 # Device to use dor training
 _C.DEVICE = "cuda:0"

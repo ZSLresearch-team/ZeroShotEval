@@ -1,9 +1,11 @@
 import numpy as np
 import torch
 from torch import nn as nn
-from torch.utils.data import DataLoader, TensorDataset
-from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import TensorDataset
 
+from zeroshoteval.dataset.loader import construct_loader
+from zeroshoteval.dataset.loader_helper import build_gen_loaders
+from zeroshoteval.utils import checkpoint as cu
 from zeroshoteval.utils.misc import log_model_info
 from zeroshoteval.utils.optimizer_helper import build_optimizer
 
@@ -17,7 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 def train_VAE(
-    cfg, model, train_loader, optimizer, *args, **kwargs,
+    cfg,
+    model,
+    train_loader,
+    optimizer,
+    *args,
+    **kwargs,
 ):
     r"""
     Train VAE model.
@@ -32,7 +39,7 @@ def train_VAE(
     Returns:
         loss_history(list): CADA-VAE traing loss history
     """
-    logger.info("Train CADA-VAE model")
+    logger.info("Train CADA-VAE net")
 
     loss_history = []
     loss_vae = []
@@ -94,7 +101,8 @@ def train_VAE(
         logger.info(
             f"Epoch: {epoch+1} "
             f"Loss: {loss_accum_mean:.1f} "
-            f"Loss vae: {loss_vae_accum}, loss ca: {loss_ca_accum} loss da: {loss_da_accum}"
+            f"Loss vae: {loss_vae_accum}, loss ca: {loss_ca_accum} "
+            f"loss da: {loss_da_accum}"
         )
 
         loss_history.append(loss_accum_mean)
@@ -125,10 +133,7 @@ def eval_VAE(
 
         for _i_step, (x, _y) in enumerate(test_loader):
 
-            if test_modality == "IMG":
-                x = x[test_modality].float().to(device)
-            else:
-                x = x.float().to(device)
+            x = x.float().to(device)
             z_mu, _z_logvar, z_noize = model.encoder[test_modality](x)
 
             if reparametrize_with_noise:
@@ -359,70 +364,52 @@ def loss_factors(current_epoch, warmup):
     return beta, cross_reconstruction_factor, distance_factor
 
 
-def generate_synthetic_dataset(cfg, dataset, model):
+def generate_synthetic_dataset(cfg, model):
     r"""
     Generates synthetic dataset via trained zsl model to cls training
 
     Args:
-        cfg(dict): dictionary with setting for model.
-        dataset: original dataset.
+        cfg(CfgNode): configs. Details can be found in
+            zeroshoteval/config/defaults.py
         model: pretrained CADA-VAE model.
 
     Returns:
-        zsl_emb_dataset: sythetic dataset for classifier .
+        zsl_emb_dataset: sythetic dataset for classifier.
         csl_train_indice: train indicies.
         csl_test_indice: test indicies.
     """
     logger.info("ZSL embedding generation")
-    (
-        zsl_emb_object_indice,
-        zsl_emb_class,
-        zsl_emb_class_label,
-    ) = dataset.get_zsl_emb_indice(cfg.ZSL.SAMPLES_PER_CLASS)
 
     # Set CADA-Vae model to evaluate mode
     model.eval()
 
+    loader = build_gen_loaders(cfg)
     # Generate zsl embeddings for train seen images
     if cfg.GENERALIZED:
-        sampler = SubsetRandomSampler(zsl_emb_object_indice)
-        loader = DataLoader(
-            dataset, batch_size=cfg.ZSL.BATCH_SIZE, sampler=sampler
-        )
-
         zsl_emb_img, zsl_emb_labels_img = eval_VAE(
-            model, loader, "IMG", cfg.DEVICE
+            model, loader["train_img_loader"], "IMG", cfg.DEVICE
         )
     else:
         zsl_emb_img = torch.FloatTensor()
         zsl_emb_labels_img = torch.LongTensor()
 
     # Generate zsl embeddings for unseen classes
-    zsl_emb_class = torch.from_numpy(zsl_emb_class)
-    zsl_emb_class_label = torch.from_numpy(zsl_emb_class_label)
-    zsl_emb_dataset = TensorDataset(zsl_emb_class, zsl_emb_class_label)
-
-    loader = DataLoader(zsl_emb_dataset, batch_size=cfg.ZSL.BATCH_SIZE)
-
     zsl_emb_cls_attr, labels_cls_attr = eval_VAE(
-        model, loader, "CLS_ATTR", cfg.DEVICE
+        model, loader["train_attr_loader"], "CLS_ATTR", cfg.DEVICE
     )
-    if not cfg.GENERALIZED:
-        labels_cls_attr = remap_labels(
-            labels_cls_attr.cpu().numpy(), dataset.unseen_classes
-        )
-        labels_cls_attr = torch.from_numpy(labels_cls_attr)
+    # if not cfg.GENERALIZED:
+    #     labels_cls_attr = remap_labels(
+    #         labels_cls_attr.cpu().numpy(), dataset.unseen_classes
+    #     )
+    #     labels_cls_attr = torch.from_numpy(labels_cls_attr)
 
     # Generate zsl embeddings for test data
-    if cfg.GENERALIZED:
-        sampler = SubsetRandomSampler(dataset.test_indices)
-    else:
-        sampler = SubsetRandomSampler(dataset.test_unseen_indices)
-
-    loader = DataLoader(dataset, batch_size=cfg.ZSL.BATCH_SIZE, sampler=sampler)
-
     zsl_emb_test, zsl_emb_labels_test = eval_VAE(
-        model, loader, "IMG", cfg.DEVICE, reparametrize_with_noise=False,
+        model,
+        loader["test_loader"],
+        "IMG",
+        cfg.DEVICE,
+        reparametrize_with_noise=False,
     )
 
     # Create zsl embeddings dataset
@@ -443,7 +430,12 @@ def generate_synthetic_dataset(cfg, dataset, model):
 
     zsl_emb_dataset = TensorDataset(zsl_emb, labels_tensor)
 
-    return zsl_emb_dataset, csl_train_indice, csl_test_indice
+    data = {
+        "dataset": zsl_emb_dataset,
+        "train_indicies": csl_train_indice,
+        "test_indicies": csl_test_indice,
+    }
+    return data
 
 
 def remap_labels(labels, classes):
@@ -463,9 +455,7 @@ def remap_labels(labels, classes):
 
 
 @ZSL_MODEL_REGISTRY.register()
-def CADA_VAE_train_procedure(
-    cfg, dataset, gen_syn_data=True, save_model=False, save_dir="checkpoints",
-):
+def CADA_VAE_train_procedure(cfg):
     """
     Starts CADA-VAE model training and generates zsl_embedding dataset for
     classifier training.
@@ -473,14 +463,9 @@ def CADA_VAE_train_procedure(
     Args:
         cfg(CfgNode): configs. Details can be found in
             zeroshoteval/config/defaults.py
-        dataset(Dataset): dataset for training and evaluating.
-        gen_sen_data(bool): if ``True`` generates synthetic data for classifier
-            after training.
-        save_model(bool):  if ``True`` saves model.
-        save_dir(str): root to models save dir.
 
     Returns:
-        model: trained model.
+        data(dict): dictionary with zero-shot embeddings dataset and extra data.
 
     """
     logger.info("Building CADA-VAE model")
@@ -488,7 +473,6 @@ def CADA_VAE_train_procedure(
         hidden_size_encoder=cfg.CADA_VAE.HIDDEN_SIZE.ENCODER,
         hidden_size_decoder=cfg.CADA_VAE.HIDDEN_SIZE.DECODER,
         latent_size=cfg.CADA_VAE.LATENT_SIZE,
-        modalities=dataset.modalities,
         feature_dimensions=cfg.DATA.FEAT_EMB.DIM,
         use_bn=cfg.CADA_VAE.USE_BN,
         use_dropout=False,
@@ -500,29 +484,23 @@ def CADA_VAE_train_procedure(
     # Model training
     optimizer = build_optimizer(model, cfg, "ZSL")
 
-    train_sampler = SubsetRandomSampler(dataset.train_indices)
-    train_loader = DataLoader(
-        dataset,
-        batch_size=cfg.ZSL.BATCH_SIZE,
-        sampler=train_sampler,
-        drop_last=cfg.DATA_LOADER.DROP_LAST,
-        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
-    )
+    train_loader_with_extras = construct_loader(cfg, "trainval")
 
-    loss_history = train_VAE(
+    train_VAE(
         cfg=cfg,
         model=model,
-        train_loader=train_loader,
+        train_loader=train_loader_with_extras["loader"],
         optimizer=optimizer,
         recon_loss_norm=cfg.CADA_VAE.NORM_TYPE,
     )
-    if save_model:
-        # TODO: implement model saving
-        pass
+    data = {
+        **generate_synthetic_dataset(cfg, model),
+        **train_loader_with_extras,
+    }
+    del data["loader"]
 
-    if gen_syn_data:
+    if cfg.ZSL.SAVE_EMB:
+        # Saving embeddings
+        cu.save_embeddings(cfg.OUTPUT_DIR, data, cfg)
 
-        return generate_synthetic_dataset(cfg, dataset, model)
-
-    return model
+    return data

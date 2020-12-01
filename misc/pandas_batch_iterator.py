@@ -4,15 +4,14 @@ from math import ceil
 
 
 class PandasBatchIterator:
-    """Iterates pandas dataframe in batches
-    """
+    """Iterates pandas dataframe in batches"""
 
     def __init__(self, dataframe, batch_size=64, columns=None):
         """
         Args:
             dataframe (pandas.DataFrame): input dataframe
             batch_size (int): batch size
-            columns (list): columns to include in output dataframe 
+            columns (list): columns to include in output dataframe
                 (returns all by default)
         """
         self._dataframe = dataframe

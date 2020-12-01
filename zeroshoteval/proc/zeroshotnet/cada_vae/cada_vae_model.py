@@ -16,7 +16,6 @@ class VAEModel(nn.Module):
         hidden_size_encoder,
         hidden_size_decoder,
         latent_size,
-        modalities,
         feature_dimensions,
         *args,
         **kvargs,
@@ -29,7 +28,7 @@ class VAEModel(nn.Module):
                 modalities embedding size.
         """
         super(VAEModel, self).__init__()
-        self.modalities = modalities
+        self.modalities = ["IMG", "CLS_ATTR"]
         self.hidden_size_encoder = hidden_size_encoder
         self.hidden_size_decoder = hidden_size_decoder
         self.latent_size = latent_size
