@@ -9,7 +9,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 from zeroshoteval.utils.misc import RNG_seed_setup, log_model_info
 from zeroshoteval.solver.optimizer_helper import build_optimizer
-from zeroshoteval.solver.checkpoint import load_embeddings
+from zeroshoteval.utils.checkpoint import load_embeddings
 
 import logging
 
