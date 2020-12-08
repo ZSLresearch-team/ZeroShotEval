@@ -24,8 +24,8 @@ class _ColorfulFormatter(logging.Formatter):
         if record.levelno == logging.WARNING:
             prefix = colored("WARNING", "red", attrs=["blink"])
         elif (
-            record.levelno == logging.ERROR
-            or record.levelno == logging.CRITICAL
+                record.levelno == logging.ERROR
+                or record.levelno == logging.CRITICAL
         ):
             prefix = colored("ERROR", "red", attrs=["blink", "underline"])
         else:
@@ -35,14 +35,7 @@ class _ColorfulFormatter(logging.Formatter):
 
 # so that calling setup_logger multiple times won't add many handlers
 @functools.lru_cache()
-def setup_logger(
-    output=None,
-    distributed_rank=0,
-    *,
-    color=True,
-    name="zeroshoteval",
-    abbrev_name=None,
-):
+def setup_logger(output=None, distributed_rank=0, *, color=True, name="zeroshoteval", abbrev_name=None):
     """
     Initialize the zeroshoteval logger and set its verbosity level to "DEBUG".
     Args:
@@ -64,10 +57,8 @@ def setup_logger(
 
     if abbrev_name is None:
         abbrev_name = "zse" if name == "zeroshoteval" else name
-    plain_formatter = logging.Formatter(
-        "[%(asctime)s] %(name)s %(levelname)s: %(message)s",
-        datefmt="%m/%d %H:%M:%S",
-    )
+    plain_formatter = logging.Formatter("[%(asctime)s] %(name)s %(levelname)s: %(message)s", datefmt="%m/%d %H:%M:%S")
+
     # stdout logging
     ch = logging.StreamHandler(stream=sys.stdout)
     ch.setLevel(logging.DEBUG)

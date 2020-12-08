@@ -1,7 +1,7 @@
 # Script for dataloader construction
 import torch
 
-from zeroshoteval.dataset.dataset import (
+from zeroshoteval.data.dataset import (
     GenEmbeddingDataset,
     ObjEmbeddingDataset,
 )

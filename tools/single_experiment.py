@@ -51,10 +51,7 @@ def experiment(cfg: CfgNode) -> None:
     # --------------------------------------------------------------------------
 
     # Embeddings loading from disk
-    # TODO: write a script for transforming matfiles to a saved torch tensor
-    # TODO: merge Misha's changes of dataloader
     # TODO: Replace ObjEmbeddingDataset with loader from separate files
-    data = ObjEmbeddingDataset(cfg.DATA.FEAT_EMB.PATH, ["IMG"], cfg.VERBOSE)
 
     # Training
     train_procedure = build_zsl(cfg)
