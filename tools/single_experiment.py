@@ -1,14 +1,16 @@
 """Main script-launcher for training of ZSL models."""
 
+import os
 from argparse import Namespace
 
 from fvcore.common.config import CfgNode
 
-from zeroshoteval.data.dataset import ObjEmbeddingDataset
 from zeroshoteval.evaluation.classification import classification_procedure
 from zeroshoteval.utils.defaults import default_setup
 from zeroshoteval.utils.parser import load_config, parse_args
 from zeroshoteval.zeroshotnets.build import build_zsl
+
+os.chdir("../")
 
 
 def setup(args: Namespace) -> CfgNode:
@@ -51,7 +53,7 @@ def experiment(cfg: CfgNode) -> None:
     # --------------------------------------------------------------------------
 
     # Embeddings loading from disk
-    # TODO: Replace ObjEmbeddingDataset with loader from separate files
+    # TODO: Replace ModalitiesEmbeddingDataset with loader from separate files
 
     # Training
     train_procedure = build_zsl(cfg)

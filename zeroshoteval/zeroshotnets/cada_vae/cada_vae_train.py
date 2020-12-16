@@ -1,29 +1,30 @@
-import time
-import numpy as np
-import torch
-from torch import nn as nn
-from torch.utils.data import TensorDataset
-
-from zeroshoteval.zeroshotnets.trainer_base import TrainerBase
-
-from zeroshoteval.data.loader import construct_loader
-from zeroshoteval.data.loader_helper import build_gen_loaders
-from zeroshoteval.utils import checkpoint as cu
-from zeroshoteval.utils.misc import log_model_info
-from zeroshoteval.solver.optimizer_helper import build_optimizer
-
 import itertools
 import logging
+import time
 
+import numpy as np
+import torch
+from fvcore.common.config import CfgNode
+from torch import nn as nn
+from torch.nn.modules.module import Module
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import TensorDataset
+from torch.utils.data.dataloader import DataLoader
+
+from zeroshoteval.data.dataloader_helper import construct_loader
+from zeroshoteval.data.dataloader_helper import build_gen_loaders
+from zeroshoteval.solver.optimizer_helper import build_optimizer
+from zeroshoteval.utils import checkpoint as cu
+from zeroshoteval.utils.misc import log_model_info
 from zeroshoteval.zeroshotnets.build import ZSL_MODEL_REGISTRY
+from zeroshoteval.zeroshotnets.trainer_base import TrainerBase
 from .cada_vae_model import VAEModel
-
 
 logger = logging.getLogger(__name__)
 
 
 @ZSL_MODEL_REGISTRY.register()
-def CADA_VAE_train_procedure(cfg):
+def CADA_VAE_train_procedure(cfg: CfgNode) -> Module:
     """
     Starts CADA-VAE model training and generates zsl_embedding dataset for
     classifier training.
@@ -39,36 +40,36 @@ def CADA_VAE_train_procedure(cfg):
     logger.info("Building CADA-VAE model")
 
     # Model building
-    model = VAEModel(
-        hidden_size_encoder=cfg.CADA_VAE.HIDDEN_SIZE.ENCODER,
-        hidden_size_decoder=cfg.CADA_VAE.HIDDEN_SIZE.DECODER,
-        latent_size=cfg.CADA_VAE.LATENT_SIZE,
-        feature_dimensions=cfg.DATA.FEAT_EMB.DIM,
-        use_bn=cfg.CADA_VAE.USE_BN,
-        use_dropout=False,
-    )
+    # --------------
+    model = VAEModel(hidden_size_encoder=cfg.CADA_VAE.HIDDEN_SIZE.ENCODER,
+                     hidden_size_decoder=cfg.CADA_VAE.HIDDEN_SIZE.DECODER,
+                     latent_size=cfg.CADA_VAE.LATENT_SIZE,
+                     feature_dimensions=cfg.DATA.FEAT_EMB.DIM,
+                     use_bn=cfg.CADA_VAE.USE_BN,
+                     use_dropout=False)
 
     model.to(cfg.DEVICE)
     log_model_info(model, cfg.ZSL_MODEL_NAME)
 
     # Optimizer building
-    optimizer = build_optimizer(model, cfg, "ZSL")
+    # ------------------
+    optimizer = build_optimizer(model, cfg, procedure="ZSL")
 
     # Data loader building
-    train_loader_with_extras = construct_loader(cfg, "trainval")
+    # --------------------
+    train_loader = construct_loader(cfg, split="train")
 
     # Model training
-    trainer = CadaVaeTrainer(model=model,
-                             data_loader=train_loader_with_extras["loader"],
-                             optimizer=optimizer,
-                             cfg=cfg)
+    # --------------
+    trainer = CADAVAETrainer(model=model, data_loader=train_loader, optimizer=optimizer, cfg=cfg)
 
     trainer.train(max_iter=cfg.ZSL.EPOCH)
 
     # Post-training actions
+    # ---------------------
     data = {
         **generate_synthetic_dataset(cfg, model),
-        **train_loader_with_extras,
+        # **train_loader_with_extras,
     }
     del data["loader"]
 
@@ -79,9 +80,9 @@ def CADA_VAE_train_procedure(cfg):
     return data
 
 
-class CadaVaeTrainer(TrainerBase):
+class CADAVAETrainer(TrainerBase):
 
-    def __init__(self, model, data_loader, optimizer, cfg) -> None:
+    def __init__(self, model: Module, data_loader: DataLoader, optimizer: Optimizer, cfg: CfgNode) -> None:
         """
         Args:
             cfg(CfgNode): configs. Details can be found in

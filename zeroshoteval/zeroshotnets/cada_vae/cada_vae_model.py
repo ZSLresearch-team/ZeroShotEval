@@ -1,10 +1,13 @@
-from torch import nn as nn
+from typing import Any
+
+from torch.nn import ModuleDict
+from torch.nn.modules.module import Module
 
 from zeroshoteval.layers.vae_encoder import EncoderTemplate
 from zeroshoteval.layers.vae_decoder import DecoderTemplate
 
 
-class VAEModel(nn.Module):
+class VAEModel(Module):
     """
     Model performs CADA-VAE ZSL approach
 
@@ -19,7 +22,7 @@ class VAEModel(nn.Module):
         latent_size,
         feature_dimensions,
         *args,
-        **kvargs,
+        **kwargs,
     ):
         """
         Args:
@@ -29,12 +32,12 @@ class VAEModel(nn.Module):
                 modalities embedding size.
         """
         super(VAEModel, self).__init__()
-        self.modalities = ["IMG", "CLS_ATTR"]
+        self.modalities = ["IMG", "CLSATTR"]
         self.hidden_size_encoder = hidden_size_encoder
         self.hidden_size_decoder = hidden_size_decoder
         self.latent_size = latent_size
 
-        self.encoder = nn.ModuleDict()
+        self.encoder = ModuleDict()
         for modality in self.modalities:
             self.encoder.update(
                 {
@@ -43,12 +46,12 @@ class VAEModel(nn.Module):
                         self.hidden_size_encoder[modality],
                         self.latent_size,
                         *args,
-                        **kvargs,
+                        **kwargs,
                     )
                 }
             )
 
-        self.decoder = nn.ModuleDict()
+        self.decoder = ModuleDict()
         for modality in self.modalities:
             self.decoder.update(
                 {
@@ -76,11 +79,7 @@ class VAEModel(nn.Module):
         z_sample = {}
 
         for modality in self.modalities:
-            (
-                z_mu[modality],
-                z_logvar[modality],
-                z_sample[modality],
-            ) = self.encoder[modality](x[modality])
+            z_mu[modality], z_logvar[modality], z_sample[modality] = self.encoder[modality](x[modality])
 
             x_recon[modality] = self.decoder[modality](z_sample[modality])
 

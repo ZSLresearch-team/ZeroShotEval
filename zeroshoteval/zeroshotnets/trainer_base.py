@@ -1,5 +1,9 @@
-import time
 import logging
+import time
+
+from torch.nn.modules.module import Module
+from torch.optim.optimizer import Optimizer
+from torch.utils.data.dataloader import DataLoader
 
 
 class TrainerBase:
@@ -13,13 +17,13 @@ class TrainerBase:
 
     """
 
-    def __init__(self, model, data_loader, optimizer) -> None:
+    def __init__(self, model: Module, data_loader: DataLoader, optimizer: Optimizer) -> None:
         """
         Args:
-            model: a torch Module. Takes a data from data_loader and returns a
+            model: Torch nn.Module - takes a data from data_loader and returns a
                 dict of losses.
-            data_loader: an iterable. Contains data to be used to call model.
-            optimizer: a torch optimizer.
+            data_loader: An iterable - contains data to be used to call model.
+            optimizer: Torch optimizer.
         """
 
         # NOTE: One can easily define any kind of train hooks here.
