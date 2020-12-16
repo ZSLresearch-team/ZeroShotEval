@@ -45,7 +45,7 @@ _C.CADA_VAE.HIDDEN_SIZE.ENCODER = CfgNode()
 _C.CADA_VAE.HIDDEN_SIZE.ENCODER.IMG = [1560]
 
 # Class attributes hidden size
-_C.CADA_VAE.HIDDEN_SIZE.ENCODER.CLS_ATTR = [1450]
+_C.CADA_VAE.HIDDEN_SIZE.ENCODER.CLSATTR = [1450]
 
 # Decoders hidden sizes
 _C.CADA_VAE.HIDDEN_SIZE.DECODER = CfgNode()
@@ -54,7 +54,7 @@ _C.CADA_VAE.HIDDEN_SIZE.DECODER = CfgNode()
 _C.CADA_VAE.HIDDEN_SIZE.DECODER.IMG = [1660]
 
 # Class attributes hidden size
-_C.CADA_VAE.HIDDEN_SIZE.DECODER.CLS_ATTR = [665]
+_C.CADA_VAE.HIDDEN_SIZE.DECODER.CLSATTR = [665]
 
 
 # ---------------------------------------------------------------------------- #
@@ -237,7 +237,7 @@ _C.DATA.FEAT_EMB = CfgNode()
 
 
 # Path to feature embeddings
-_C.DATA.FEAT_EMB.PATH = "data/CUB/resnet101/"
+_C.DATA.FEAT_EMB.PATH = "datasets/CUB_resnet101/"
 
 
 _C.DATA.FEAT_EMB.DIM = CfgNode()
@@ -246,7 +246,7 @@ _C.DATA.FEAT_EMB.DIM = CfgNode()
 _C.DATA.FEAT_EMB.DIM.IMG = 2048
 
 
-_C.DATA.FEAT_EMB.DIM.CLS_ATTR = 312
+_C.DATA.FEAT_EMB.DIM.CLSATTR = 312
 
 
 # ---------------------------------------------------------------------------- #
@@ -306,7 +306,7 @@ _C.DATA_LOADER.PIN_MEMORY = True
 _C.DATA_LOADER.DROP_LAST = True
 
 
-def _assert_and_infer_cfg(cfg):
+def _assert_and_infer_cfg(cfg: CfgNode) -> CfgNode:
     # CADA-VAE assertions
     assert cfg.CADA_VAE.NORM_TYPE in ["l1", "l2"]
 
@@ -319,7 +319,7 @@ def _assert_and_infer_cfg(cfg):
     return cfg
 
 
-def get_cfg():
+def get_cfg() -> CfgNode:
     """
     Get a copy of the default config.
     """

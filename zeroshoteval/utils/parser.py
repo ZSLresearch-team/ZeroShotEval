@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 """Argument parser functions."""
+from fvcore.common.config import CfgNode
 from zeroshoteval.config.defaults import get_cfg
 
-import argparse
+from argparse import ArgumentParser, REMAINDER, Namespace
 import sys
 
 
-def parse_args():
+def parse_args() -> Namespace:
     """
     Parse the following arguments for a default parser for PySlowFast users.
 
@@ -16,7 +17,7 @@ def parse_args():
         opts (argument): provide addtional options from the command line, it
             overwrites the config loaded from file.
     """
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Provide ZeroShotEval pipeline."
     )
 
@@ -31,7 +32,7 @@ def parse_args():
         "opts",
         help="See zeroshoteval/config/defaults.py for all options",
         default=None,
-        nargs=argparse.REMAINDER,
+        nargs=REMAINDER,
     )
     if len(sys.argv) == 1:
         parser.print_help()
@@ -39,7 +40,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_config(args):
+def load_config(args: Namespace) -> CfgNode:
     """
     Given the arguemnts, load and initialize the configs.
     Args:
@@ -47,7 +48,7 @@ def load_config(args):
             `init_method`, `cfg_file`, and `opts`.
     """
     # Setup cfg.
-    cfg = get_cfg()
+    cfg: CfgNode = get_cfg()
 
     # Load config from cfg.
     if args.cfg_file is not None:

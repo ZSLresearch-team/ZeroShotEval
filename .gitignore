@@ -107,10 +107,12 @@ venv.bak/
 .vscode/*
 *.code-workspace
 
+# JetBrains IDEA Template
+.idea
+
 # Local storages
-data/*
+datasets/*/
 models/*
 
 # Log files
 *.log
-*.txt
