@@ -58,6 +58,8 @@ def read_data(images_mat_file: str,
     mat_data: Dict = sio.loadmat(os.path.join(root_path, cls_attributes_mat_file))
     cls_attr_data: np.ndarray = mat_data["att"].T
 
+    cls_attr_data = extend_clsattr_data(cls_attr_data, labels_data)
+
     # TODO: deal with supporting data
     # if dataset == "CUB":
     #     with open(root_path / "CUB_supporting_data.p", "rb") as h:
@@ -69,10 +71,31 @@ def read_data(images_mat_file: str,
     return img_data, cls_attr_data, labels_data
 
 
+def extend_clsattr_data(cls_attr_data: np.ndarray, labels_data: np.ndarray) -> np.ndarray:
+    """
+    Extends clsattr_data from shape (num_classes, emb_size) to (num_instances, emb_size) by duplicating class embeddings
+    according to labels in labels_data.
+
+    Args:
+        cls_attr_data: Array with embeddings of class attributes.
+        labels_data: Array with dataset labels.
+
+    Returns: Array with extended clsattr_data.
+
+    """
+    if len(cls_attr_data) == len(labels_data):
+        logger.warning("Class attributes data seems to be already extended. Length of array is the same as labels.")
+        return cls_attr_data
+    else:
+        extended_clsattr = [cls_attr_data[label] for label in labels_data]
+        logger.debug("Class attributes data were successfully extended according to labels data.")
+        return np.stack(extended_clsattr)
+
+
 def read_data_splits(splits_mat_file: str, root_path: str) -> pd.DataFrame:
     mat_data = sio.loadmat(os.path.join(root_path, splits_mat_file))
 
-    df = pd.DataFrame(columns=["obj_id", "is_train", "is_seen"])
+    df = pd.DataFrame(columns=["id", "is_train", "is_seen"])
 
     # NOTE: numpy array index starts from 0, matlab starts from 1
     train_indexes = mat_data["trainval_loc"].squeeze() - 1
@@ -85,7 +108,7 @@ def read_data_splits(splits_mat_file: str, root_path: str) -> pd.DataFrame:
 
     for part, params in zip((train_indexes, test_seen_indexes, test_unseen_indexes), ((1, 1), (0, 1), (0, 0))):
         part_df = pd.DataFrame(columns=df.columns)
-        part_df.loc[:, "obj_id"] = part
+        part_df.loc[:, "id"] = part
         part_df.loc[:, "is_train"] = params[0]
         part_df.loc[:, "is_seen"] = params[1]
         df = df.append(part_df)
@@ -127,7 +150,7 @@ def save_data(img_data: np.ndarray,
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
 
-    np.save(file=save_dir / f"{dataset}_img_resnet101_embeddings", arr=img_data)
+    np.save(file=save_dir / f"{dataset}_img_embeddings", arr=img_data)
     np.save(file=save_dir / f"{dataset}_clsattr_embeddings", arr=cls_attr_data)
     np.save(file=save_dir / f"{dataset}_labels", arr=labels_data)
 
