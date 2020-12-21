@@ -4,13 +4,15 @@ import os
 from argparse import Namespace
 
 from fvcore.common.config import CfgNode
+from torch.nn.modules.module import Module
 
 from zeroshoteval.evaluation.classification import classification_procedure
 from zeroshoteval.utils.defaults import default_setup
 from zeroshoteval.utils.parser import load_config, parse_args
 from zeroshoteval.zeroshotnets.build import build_zsl
+from zeroshoteval.zeroshotnets.cada_vae.cada_vae_inference import CADA_VAE_inference_procedure
 
-os.chdir("../")
+# os.chdir("../")
 
 
 def setup(args: Namespace) -> CfgNode:
@@ -41,10 +43,6 @@ def experiment(cfg: CfgNode) -> None:
     # paths to all embedding files.
     # --------------------------------------------------------------------------
 
-    # Extraction
-    pass
-
-    # Embeddings saving to disk (save as torch tensor)
     pass
 
     # STEP 2 - MODEL TRAINING
@@ -57,7 +55,7 @@ def experiment(cfg: CfgNode) -> None:
 
     # Training
     train_procedure = build_zsl(cfg)
-    zsl_data = train_procedure(cfg)
+    model: Module = train_procedure(cfg)
 
     # STEP 3 - MODEL INFERENCE
     # Apply trained model to test data and (similar to the prev step) extract
@@ -65,10 +63,8 @@ def experiment(cfg: CfgNode) -> None:
     # --------------------------------------------------------------------------
 
     # TODO: extract gen_synthetic_data from CADA-VAE and move it to inference section
-    pass
-
-    # Zero-shot embeddings saving to disk (save as torch tensor)
-    pass
+    # TODO: replace CADA-VAE with general model
+    zsl_data = CADA_VAE_inference_procedure(cfg, model)
 
     # STEP 4 - MODEL EVALUATION
     # Pass extracted zero-shot embeddings to one of evaluation tasks (

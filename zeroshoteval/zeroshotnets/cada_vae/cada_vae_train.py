@@ -2,19 +2,15 @@ import itertools
 import logging
 import time
 
-import numpy as np
 import torch
 from fvcore.common.config import CfgNode
 from torch import nn as nn
 from torch.nn.modules.module import Module
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
 
 from zeroshoteval.data.dataloader_helper import construct_loader
-from zeroshoteval.data.dataloader_helper import build_gen_loaders
 from zeroshoteval.solver.optimizer_helper import build_optimizer
-from zeroshoteval.utils import checkpoint as cu
 from zeroshoteval.utils.misc import log_model_info
 from zeroshoteval.zeroshotnets.build import ZSL_MODEL_REGISTRY
 from zeroshoteval.zeroshotnets.trainer_base import TrainerBase
@@ -65,19 +61,7 @@ def CADA_VAE_train_procedure(cfg: CfgNode) -> Module:
 
     trainer.train(max_iter=cfg.ZSL.EPOCH)
 
-    # Post-training actions
-    # ---------------------
-    data = {
-        **generate_synthetic_dataset(cfg, model),
-        # **train_loader_with_extras,
-    }
-    del data["loader"]
-
-    if cfg.ZSL.SAVE_EMB:
-        # Saving embeddings
-        cu.save_embeddings(cfg.OUTPUT_DIR, data, cfg)
-
-    return data
+    return model
 
 
 class CADAVAETrainer(TrainerBase):
@@ -392,126 +376,3 @@ class CADAVAETrainer(TrainerBase):
             )
 
         return loss_recon
-
-
-def eval_VAE(model, test_loader, test_modality, device, reparametrize_with_noise=True):
-    """
-    Calculate zsl embeddings for given VAE model and data.
-
-    Args:
-        model: VAE model.
-        test_loader: test dataloader.
-        test_modality: modality name for modality to test.
-        device: device to use for inference.
-
-    Returns:
-        zsl_emb: zero shot learning embeddings for given data and model
-    """
-    model.eval()
-
-    with torch.no_grad():
-        zsl_emb = torch.Tensor().to(device)
-        labels = torch.Tensor().long().to(device)
-
-        for _i_step, (x, _y) in enumerate(test_loader):
-
-            x = x.float().to(device)
-            z_mu, _z_logvar, z_noize = model.encoder[test_modality](x)
-
-            if reparametrize_with_noise:
-                zsl_emb = torch.cat((zsl_emb, z_noize.to(device)), 0)
-            else:
-                zsl_emb = torch.cat((zsl_emb, z_mu.to(device)), 0)
-
-            labels = torch.cat((labels, _y.long().to(device)), 0)
-
-    return zsl_emb.to(device), labels
-
-
-def generate_synthetic_dataset(cfg, model):
-    r"""
-    Generates synthetic dataset via trained zsl model to cls training
-
-    Args:
-        cfg(CfgNode): configs. Details can be found in
-            zeroshoteval/config/defaults.py
-        model: pretrained CADA-VAE model.
-
-    Returns:
-        zsl_emb_dataset: sythetic dataset for classifier.
-        csl_train_indice: train indicies.
-        csl_test_indice: test indicies.
-    """
-
-    # Set CADA-Vae model to evaluate mode
-    model.eval()
-
-    loader = build_gen_loaders(cfg)
-    # Generate zsl embeddings for train seen images
-    if cfg.GENERALIZED:
-        zsl_emb_img, zsl_emb_labels_img = eval_VAE(
-            model, loader["train_img_loader"], "IMG", cfg.DEVICE
-        )
-    else:
-        zsl_emb_img = torch.FloatTensor()
-        zsl_emb_labels_img = torch.LongTensor()
-
-    # Generate zsl embeddings for unseen classes
-    zsl_emb_cls_attr, labels_cls_attr = eval_VAE(
-        model, loader["train_attr_loader"], "CLS_ATTR", cfg.DEVICE
-    )
-    # if not cfg.GENERALIZED:
-    #     labels_cls_attr = remap_labels(
-    #         labels_cls_attr.cpu().numpy(), dataset.unseen_classes
-    #     )
-    #     labels_cls_attr = torch.from_numpy(labels_cls_attr)
-
-    # Generate zsl embeddings for test data
-    zsl_emb_test, zsl_emb_labels_test = eval_VAE(
-        model,
-        loader["test_loader"],
-        "IMG",
-        cfg.DEVICE,
-        reparametrize_with_noise=False,
-    )
-
-    # Create zsl embeddings dataset
-    zsl_emb = torch.cat((zsl_emb_img, zsl_emb_cls_attr, zsl_emb_test), 0)
-
-    zsl_emb_labels_img = zsl_emb_labels_img.long().to(cfg.DEVICE)
-    labels_cls_attr = labels_cls_attr.long().to(cfg.DEVICE)
-    zsl_emb_labels_test = zsl_emb_labels_test.long().to(cfg.DEVICE)
-
-    labels_tensor = torch.cat(
-        (zsl_emb_labels_img, labels_cls_attr, zsl_emb_labels_test), 0
-    )
-
-    # Getting train and test indices
-    n_train = len(zsl_emb_labels_img) + len(labels_cls_attr)
-    csl_train_indice = np.arange(n_train)
-    csl_test_indice = np.arange(n_train, n_train + len(zsl_emb_labels_test))
-
-    zsl_emb_dataset = TensorDataset(zsl_emb, labels_tensor)
-
-    data = {
-        "dataset": zsl_emb_dataset,
-        "train_indicies": csl_train_indice,
-        "test_indicies": csl_test_indice,
-    }
-    return data
-
-
-def remap_labels(labels, classes):
-    """
-    Remapping labels
-
-    Args:
-        labels(np.array): array of labels
-        classes:
-
-    Returns:
-        Remapped labels
-    """
-    remapping_dict = dict(zip(classes, list(range(len(classes)))))
-
-    return np.vectorize(remapping_dict.get)(labels)

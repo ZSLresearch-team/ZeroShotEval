@@ -105,7 +105,8 @@ _C.CADA_VAE.WARMUP.DISTANCE.START_EPOCH = 6
 _C.ZSL = CfgNode()
 
 # Number training epochs
-_C.ZSL.EPOCH = 100
+# _C.ZSL.EPOCH = 100
+_C.ZSL.EPOCH = 10
 
 # Training mini-batch size
 _C.ZSL.BATCH_SIZE = 128
@@ -123,7 +124,7 @@ _C.ZSL.SAMPLES_PER_CLASS = CfgNode()
 _C.ZSL.SAMPLES_PER_CLASS.IMG = 200
 
 # Samples per class for class attribut modality
-_C.ZSL.SAMPLES_PER_CLASS.CLS_ATTR = 400
+_C.ZSL.SAMPLES_PER_CLASS.CLSATTR = 400
 
 
 # ---------------------------------------------------------------------------- #

@@ -1,15 +1,19 @@
-from typing import Tuple
+from typing import Tuple, Dict
 
 import torch
 import numpy as np
+from fvcore.common.config import CfgNode
 from torch import Tensor
 from torch.nn.modules.module import Module
 from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
 
+from zeroshoteval.data.dataloader_helper import construct_loader
+from zeroshoteval.utils import checkpoint
 
-def CADA_VAE_inference_procedure(cfg, model):
-    r"""
+
+def CADA_VAE_inference_procedure(cfg: CfgNode, model: Module) -> Tuple[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor]]:
+    """
     Generates synthetic dataset via trained zsl model to cls training
 
     Args:
@@ -22,76 +26,86 @@ def CADA_VAE_inference_procedure(cfg, model):
         csl_train_indice: train indicies.
         csl_test_indice: test indicies.
     """
+    # Data loader building
+    # --------------------
+    train_loader = construct_loader(cfg, split="train")
+    test_loader = construct_loader(cfg, split="test")
 
-    # Set CADA-Vae model to evaluate mode
-    model.eval()
+    train_zsl_data: Dict[str, Tuple[Tensor, Tensor]] = dict()
+    test_zsl_data: Dict[str, Tuple[Tensor, Tensor]] = dict()
 
-    loader = build_gen_loaders(cfg)
-    # Generate zsl embeddings for train seen images
+    # Generate ZSL embeddings for train (seen) images
+    # -----------------------------------------------
+    # zsl_emb_img, zsl_emb_labels_img = CADA_VAE_inference(model=model,
+    train_zsl_data["IMG"] = CADA_VAE_inference(model=model,
+                                               data_loader=train_loader,
+                                               modality="IMG",
+                                               device=cfg.DEVICE)
+
+    # Generate ZSL embeddings for additional modality (CLSATTR) to use for classifier TRAINING
+    # (give classifier info about unseen classes with another modality)
+    # ----------------------------------------------------------------------------------------
+    test_zsl_data["CLSATTR"] = CADA_VAE_inference(model=model,
+                                                  data_loader=test_loader,
+                                                  modality="CLSATTR",
+                                                  device=cfg.DEVICE)
+
+    # Leave unseen instances only as additional info for the classifier
+    test_embeddings, test_labels = test_zsl_data["CLSATTR"]
+
+    test_embeddings = test_embeddings[test_loader.dataset.unseen_indexes]
+    test_labels = test_labels[test_loader.dataset.unseen_indexes]
+
+    test_zsl_data["CLSATTR"] = (test_embeddings, test_labels)
+
+    # Generate ZSL embeddings for test data
+    # -------------------------------------
+    test_zsl_data["IMG"] = CADA_VAE_inference(model=model,
+                                              data_loader=test_loader,
+                                              modality="IMG",
+                                              device=cfg.DEVICE,
+                                              reparametrize_with_noise=False)
+
+    # For Generalized ZSL setting leave only unseen indexes
     if cfg.GENERALIZED:
-        zsl_emb_img, zsl_emb_labels_img = CADA_VAE_inference(
-            model, loader["train_img_loader"], "IMG", cfg.DEVICE
+        test_embeddings, test_labels = test_zsl_data["IMG"]
+
+        test_embeddings = test_embeddings[test_loader.dataset.unseen_indexes]
+        test_labels = test_labels[test_loader.dataset.unseen_indexes]
+
+        test_zsl_data["IMG"] = (test_embeddings, test_labels)
+
+    # Creation of the final data layout
+    # ---------------------------------
+    train_data: Tuple[Tensor, Tensor] = (
+        torch.cat((train_zsl_data["IMG"][0], test_zsl_data["CLSATTR"][0]), dim=0),
+        torch.cat((train_zsl_data["IMG"][1], test_zsl_data["CLSATTR"][1]), dim=0)
+    )
+
+    test_data: Tuple[Tensor, Tensor] = test_zsl_data["IMG"]
+
+    if cfg.ZSL.SAVE_EMB:
+        data: Tuple[Tensor, Tensor] = (
+            torch.cat((train_data[0], test_data[0]), dim=0),
+            torch.cat((train_data[1], test_data[1]), dim=0)
         )
-    else:
-        zsl_emb_img = torch.FloatTensor()
-        zsl_emb_labels_img = torch.LongTensor()
+        # TODO: change embeddings saving to saving of 3 files: embeddings, labels, splits
+        checkpoint.save_embeddings(cfg.OUTPUT_DIR, data, cfg)
 
-    # Generate zsl embeddings for unseen classes
-    zsl_emb_cls_attr, labels_cls_attr = CADA_VAE_inference(
-        model, loader["train_attr_loader"], "CLS_ATTR", cfg.DEVICE
-    )
-    # if not cfg.GENERALIZED:
-    #     labels_cls_attr = remap_labels(
-    #         labels_cls_attr.cpu().numpy(), dataset.unseen_classes
-    #     )
-    #     labels_cls_attr = torch.from_numpy(labels_cls_attr)
-
-    # Generate zsl embeddings for test data
-    zsl_emb_test, zsl_emb_labels_test = CADA_VAE_inference(
-        model,
-        loader["test_loader"],
-        "IMG",
-        cfg.DEVICE,
-        reparametrize_with_noise=False,
-    )
-
-    # Create zsl embeddings dataset
-    zsl_emb = torch.cat((zsl_emb_img, zsl_emb_cls_attr, zsl_emb_test), 0)
-
-    zsl_emb_labels_img = zsl_emb_labels_img.long().to(cfg.DEVICE)
-    labels_cls_attr = labels_cls_attr.long().to(cfg.DEVICE)
-    zsl_emb_labels_test = zsl_emb_labels_test.long().to(cfg.DEVICE)
-
-    labels_tensor = torch.cat(
-        (zsl_emb_labels_img, labels_cls_attr, zsl_emb_labels_test), 0
-    )
-
-    # Getting train and test indices
-    n_train = len(zsl_emb_labels_img) + len(labels_cls_attr)
-    csl_train_indice = np.arange(n_train)
-    csl_test_indice = np.arange(n_train, n_train + len(zsl_emb_labels_test))
-
-    zsl_emb_dataset = TensorDataset(zsl_emb, labels_tensor)
-
-    data = {
-        "dataset": zsl_emb_dataset,
-        "train_indicies": csl_train_indice,
-        "test_indicies": csl_test_indice,
-    }
-    return data
+    return train_data, test_data
 
 
 def CADA_VAE_inference(model: Module,
-                       dataloader: DataLoader,
+                       data_loader: DataLoader,
                        modality: str,
                        device: str,
-                       reparametrize_with_noise: bool = True) -> Tuple[Tensor, np.ndarray]:
+                       reparametrize_with_noise: bool = True) -> Tuple[Tensor, Tensor]:
     """
     Calculate zsl embeddings for given VAE model and data.
 
     Args:
         model:
-        dataloader:
+        data_loader:
         modality:
         device:
         reparametrize_with_noise:
@@ -105,7 +119,9 @@ def CADA_VAE_inference(model: Module,
         zsl_emb = torch.Tensor().to(device)
         labels = torch.Tensor().long().to(device)
 
-        for _i_step, (x, y) in enumerate(dataloader):
+        for _i_step, (x, y) in enumerate(data_loader):
+
+            x = x[modality]
 
             x = x.float().to(device)
             z_mu, z_logvar, z_noize = model.encoder[modality](x)
@@ -116,6 +132,5 @@ def CADA_VAE_inference(model: Module,
                 zsl_emb = torch.cat((zsl_emb, z_mu.to(device)), 0)
 
             labels: Tensor = torch.cat((labels, y.long().to(device)), 0)
-            labels: np.ndarray = labels.cpu().detach().numpy()
 
     return zsl_emb.to(device), labels
