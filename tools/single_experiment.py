@@ -1,6 +1,5 @@
 """Main script-launcher for training of ZSL models."""
 
-import os
 from argparse import Namespace
 
 from fvcore.common.config import CfgNode
@@ -11,6 +10,7 @@ from zeroshoteval.utils.defaults import default_setup
 from zeroshoteval.utils.parser import load_config, parse_args
 from zeroshoteval.zeroshotnets.build import build_zsl
 from zeroshoteval.zeroshotnets.cada_vae.cada_vae_inference import CADA_VAE_inference_procedure
+
 
 # os.chdir("../")
 
@@ -62,16 +62,15 @@ def experiment(cfg: CfgNode) -> None:
     # zero-shot embeddings.
     # --------------------------------------------------------------------------
 
-    # TODO: extract gen_synthetic_data from CADA-VAE and move it to inference section
     # TODO: replace CADA-VAE with general model
-    zsl_data = CADA_VAE_inference_procedure(cfg, model)
+    train_data, test_data = CADA_VAE_inference_procedure(cfg, model)
 
     # STEP 4 - MODEL EVALUATION
     # Pass extracted zero-shot embeddings to one of evaluation tasks (
     # classification, clustering, verification, etc.)
     # --------------------------------------------------------------------------
 
-    classification_procedure(cfg=cfg, data=zsl_data)
+    classification_procedure(cfg, train_data, test_data)
 
 
 if __name__ == "__main__":

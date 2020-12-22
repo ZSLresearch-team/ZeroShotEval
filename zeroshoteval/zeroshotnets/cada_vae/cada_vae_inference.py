@@ -1,11 +1,9 @@
 from typing import Tuple, Dict
 
 import torch
-import numpy as np
 from fvcore.common.config import CfgNode
 from torch import Tensor
 from torch.nn.modules.module import Module
-from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
 
 from zeroshoteval.data.dataloader_helper import construct_loader
@@ -36,7 +34,6 @@ def CADA_VAE_inference_procedure(cfg: CfgNode, model: Module) -> Tuple[Tuple[Ten
 
     # Generate ZSL embeddings for train (seen) images
     # -----------------------------------------------
-    # zsl_emb_img, zsl_emb_labels_img = CADA_VAE_inference(model=model,
     train_zsl_data["IMG"] = CADA_VAE_inference(model=model,
                                                data_loader=train_loader,
                                                modality="IMG",
@@ -67,7 +64,7 @@ def CADA_VAE_inference_procedure(cfg: CfgNode, model: Module) -> Tuple[Tuple[Ten
                                               reparametrize_with_noise=False)
 
     # For Generalized ZSL setting leave only unseen indexes
-    if cfg.GENERALIZED:
+    if not cfg.GENERALIZED:
         test_embeddings, test_labels = test_zsl_data["IMG"]
 
         test_embeddings = test_embeddings[test_loader.dataset.unseen_indexes]

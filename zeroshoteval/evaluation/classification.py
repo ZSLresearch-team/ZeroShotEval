@@ -1,10 +1,14 @@
 """
 """
+from typing import Tuple, Optional, List
+
 import numpy as np
 import torch
+from fvcore.common.config import CfgNode
 from sklearn.metrics import confusion_matrix
-from torch import nn as nn
+from torch import nn as nn, Tensor
 from torch.utils.data import DataLoader
+from torch.utils.data.dataset import TensorDataset
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from zeroshoteval.utils.misc import RNG_seed_setup, log_model_info
@@ -51,15 +55,14 @@ def weights_init(m):
 
 
 def train_cls(
-    classifier,
-    optimizer,
-    device,
-    n_epoch,
-    num_classes,
-    seen_classes,
-    unseen_classes,
-    train_loader,
-    test_loader,
+        classifier,
+        optimizer,
+        device,
+        n_epoch,
+        seen_classes,
+        unseen_classes,
+        train_loader,
+        test_loader,
 ):
     """
     Train Softmax classifier model
@@ -120,7 +123,7 @@ def train_cls(
         acc_H_hist.append(acc_H)
 
         logger.info(
-            f"Epoch: {_epoch+1} "
+            f"Epoch: {_epoch + 1} "
             f"Loss: {loss_accum_mean:.1f} Seen: {acc_seen:.2f} "
             f"Unseen: {acc_unseen:.2f} H: {acc_H:.2f}"
         )
@@ -129,7 +132,7 @@ def train_cls(
 
 
 def compute_mean_per_class_accuracies(
-    classifier, loader, seen_classes, unseen_classes, device
+        classifier, loader, seen_classes, unseen_classes, device
 ):
     """
     Computes mean per-class accuracies for both seen and unseen classes.
@@ -165,13 +168,8 @@ def compute_mean_per_class_accuracies(
     conf_matrix = confusion_matrix(
         labels_all.cpu().numpy(), preds_all.cpu().numpy()
     )
-    acc_seen = (
-        np.diag(conf_matrix)[seen_classes] / conf_matrix.sum(1)[seen_classes]
-    ).mean()
-    acc_unseen = (
-        np.diag(conf_matrix)[unseen_classes]
-        / conf_matrix.sum(1)[unseen_classes]
-    ).mean()
+    acc_seen = (np.diag(conf_matrix)[seen_classes-1] / conf_matrix.sum(1)[seen_classes-1]).mean()
+    acc_unseen = (np.diag(conf_matrix)[unseen_classes-1] / conf_matrix.sum(1)[unseen_classes-1]).mean()
 
     if (acc_unseen < 1e-4) or (acc_seen < 1e-4):
         acc_H = 0
@@ -181,7 +179,9 @@ def compute_mean_per_class_accuracies(
     return acc_seen, acc_unseen, acc_H
 
 
-def classification_procedure(cfg, data=None):
+def classification_procedure(cfg: CfgNode,
+                             train_data: Optional[Tuple[Tensor, Tensor]] = None,
+                             test_data: Optional[Tuple[Tensor, Tensor]] = None) -> Tuple[List, List, List, List]:
     """
     Launches classifier training.
 
@@ -199,39 +199,40 @@ def classification_procedure(cfg, data=None):
     RNG_seed_setup(cfg)
 
     if cfg.CLS.LOAD_DATA:
+        # TODO: refactor embeddings saving/loading (see `saving`)
         data = load_embeddings(cfg)
 
-    assert (data is not None, logger.error("Data neighter loaded nor passed"))
+    assert train_data is not None and test_data is not None, "Input data were not passed or loaded from disk."
 
     logger.info("Building final classifier model")
-    classifier = SoftmaxClassifier(
-        data["dataset"].tensors[0].size(1), data["num_classes"]
-    )
+    classifier = SoftmaxClassifier(cls_in=train_data[0].size()[1],
+                                   num_classes=train_data[1].unique().size()[0])
     classifier.to(cfg.DEVICE)
     log_model_info(classifier, "Final Classifier")
 
-    train_sampler = SubsetRandomSampler(data["train_indicies"])
-    test_sampler = SubsetRandomSampler(data["test_indicies"])
+    # train_sampler = SubsetRandomSampler(data["train_indicies"])
+    # test_sampler = SubsetRandomSampler(data["test_indicies"])
 
-    train_loader = DataLoader(
-        data["dataset"], batch_size=cfg.CLS.BATCH_SIZE, sampler=train_sampler
-    )
-    test_loader = DataLoader(
-        data["dataset"], batch_size=cfg.CLS.BATCH_SIZE, sampler=test_sampler
-    )
+    num_seen_classes = 200
+    num_unseen_classes = 50
 
-    optimizer = build_optimizer(classifier, cfg, "CLS")
+    train_dataset = TensorDataset(train_data[0], train_data[1])
+    test_dataset = TensorDataset(test_data[0], test_data[1])
+
+    train_loader = DataLoader(dataset=train_dataset, batch_size=cfg.CLS.BATCH_SIZE, shuffle=True)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=cfg.CLS.BATCH_SIZE, shuffle=True)
+
+    optimizer = build_optimizer(model=classifier, cfg=cfg, procedure="CLS")
 
     train_loss_hist, acc_seen_hist, acc_unseen_hist, acc_H_hist = train_cls(
-        classifier,
-        optimizer,
-        cfg.DEVICE,
-        cfg.CLS.EPOCH,
-        data["num_classes"],
-        data["seen_classes"],
-        data["unseen_classes"],
-        train_loader,
-        test_loader,
+        classifier=classifier,
+        optimizer=optimizer,
+        device=cfg.DEVICE,
+        n_epoch=cfg.CLS.EPOCH,
+        seen_classes=num_seen_classes,
+        unseen_classes=num_unseen_classes,
+        train_loader=train_loader,
+        test_loader=test_loader
     )
 
     best_H_idx = acc_H_hist.index(max(acc_H_hist))

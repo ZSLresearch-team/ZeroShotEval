@@ -106,7 +106,7 @@ _C.ZSL = CfgNode()
 
 # Number training epochs
 # _C.ZSL.EPOCH = 100
-_C.ZSL.EPOCH = 10
+_C.ZSL.EPOCH = 100
 
 # Training mini-batch size
 _C.ZSL.BATCH_SIZE = 128

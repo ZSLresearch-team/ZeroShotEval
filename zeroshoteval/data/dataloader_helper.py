@@ -2,7 +2,8 @@ import torch
 from fvcore.common.config import CfgNode
 from torch.utils.data.dataloader import DataLoader
 
-from zeroshoteval.data.modalities_embedding_dataset import GenEmbeddingDataset, ModalitiesEmbeddingDataset
+from zeroshoteval.data.modalities_embedding_dataset import ModalitiesEmbeddingDataset
+from zeroshoteval.data.synthetic_dataset import GenEmbeddingDataset
 
 
 def construct_loader(cfg: CfgNode, split) -> DataLoader:
@@ -53,7 +54,7 @@ def build_gen_loaders(cfg):
         data["train_img_loader"] = _construct_gen_loader(cfg, "trainval", "IMG")
 
     data["train_attr_loader"] = _construct_gen_loader(
-        cfg, "test_unseen", "CLS_ATTR"
+        cfg, "test_unseen", "CLSATTR"
     )
 
     data["test_loader"] = _construct_gen_loader(cfg, "test", "IMG")
