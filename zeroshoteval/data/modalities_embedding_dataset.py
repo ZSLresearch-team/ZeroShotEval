@@ -24,6 +24,8 @@ class ModalitiesEmbeddingDataset(Dataset):
     TODO: fill in ModalitiesEmbeddingDataset docstrings
     """
 
+    scaler = None
+
     def __init__(self, root_dir: str, modalities: List[str], split: Optional[str] = None) -> None:
         """
         Args:
@@ -37,7 +39,7 @@ class ModalitiesEmbeddingDataset(Dataset):
         assert split in ["train", "test"], f"Unknown data part! Available: {['train', 'test']}"
 
         self.root_dir = root_dir
-        self.modalities = modalities
+        self.modalities = modalities  # TODO: param does not do anything!
 
         self.splits: DataFrame = self._load_data_splits(split)
         self.data_indexes: np.ndarray = self.splits['id'].to_numpy()
@@ -108,6 +110,9 @@ class ModalitiesEmbeddingDataset(Dataset):
         for file_name in os.listdir(self.root_dir):
             modality_name = file_name.split("_", 2)[1].upper()
             if modality_name in MODALITIES_TYPES:
+                
+                # TODO: are modalities type fixed for all datasets? What if specified modality is not presented in dataset and not necessary?
+                
                 existing_modalities.append(modality_name)
                 file_paths.append(os.path.join(self.root_dir, file_name))
 
@@ -119,6 +124,16 @@ class ModalitiesEmbeddingDataset(Dataset):
         for mod_name, mod_file in zip(existing_modalities, file_paths):
             # Load NumPy array from binary file
             mod_data_numpy: np.ndarray = np.load(mod_file)
+
+            # ----------------------------------
+
+            from sklearn.preprocessing import MinMaxScaler
+
+            scaler = MinMaxScaler()
+
+            mod_data_numpy = scaler.fit_transform(mod_data_numpy)
+
+            # ----------------------------------
 
             # Select only necessary data using indexes extracted from splits earlier
             mod_data_numpy = mod_data_numpy[self.data_indexes]

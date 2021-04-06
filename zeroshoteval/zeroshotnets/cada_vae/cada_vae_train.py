@@ -1,6 +1,5 @@
 import itertools
 import logging
-import time
 
 import torch
 from fvcore.common.config import CfgNode
@@ -84,21 +83,6 @@ class CADAVAETrainer(TrainerBase):
         self.loss_ca = []
         self.loss_da = []
 
-    def train(self, max_iter: int) -> None:
-        logger = logging.getLogger(__name__)
-        logger.info("Starting training...")
-        start_time: float = time.perf_counter()
-
-        self.current_iter: int = 0
-        self.max_iter: int = max_iter
-
-        while self.current_iter < self.max_iter:
-            self.run_step()
-            self.current_iter += 1
-
-        end_time: float = time.perf_counter()
-        logger.info(f"Time elapsed for training: {start_time - end_time} seconds.")
-
     def run_step(self):
         assert self.model.training, "Model must be set to training mode!"
         loss_accum: float = 0.0
@@ -115,6 +99,7 @@ class CADAVAETrainer(TrainerBase):
 
             for modality, modality_tensor in x.items():
                 x[modality] = modality_tensor.to(self.cfg.DEVICE).float()
+                x[modality].requires_grad = False
 
             x_recon, z_mu, z_logvar, z_noize = self.model(x)
 
@@ -128,17 +113,23 @@ class CADAVAETrainer(TrainerBase):
                 beta
             )
 
+            self.optimizer.zero_grad()
+
             loss = loss_vae
             loss_vae_accum += loss_vae.item()
             loss_ca_accum += loss_ca.item() * cross_reconstruction_factor
             loss_da_accum += loss_da.item() * distance_factor
 
             if self.cfg.CADA_VAE.CROSS_RECONSTRUCTION:
+                if cross_reconstruction_factor < 0:
+                    logger.warning('Cross-reconstruction factor is less than zero!')
                 loss += loss_ca * cross_reconstruction_factor
             if self.cfg.CADA_VAE.DISTRIBUTION_ALLIGNMENT and (distance_factor > 0):
+                if distance_factor < 0:
+                    logger.warning('Distribution alignment factor is less than zero!')
                 loss += loss_da * distance_factor
 
-            self.optimizer.zero_grad()
+            # self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
@@ -246,23 +237,9 @@ class CADAVAETrainer(TrainerBase):
         loss_ca = 0
 
         for modality in z_mu.keys():
-            # Calculate reconstruction and kld loss for each modality
-            loss_recon += self.__reconstruction_loss(
-                x[modality],
-                x_recon[modality],
-                recon_loss_norm=self.cfg.CADA_VAE.NORM_TYPE
-            )
-            loss_kld += (
-                0.5
-                * (
-                    1
-                    + z_logvar[modality]
-                    - z_mu[modality].pow(2)
-                    - z_logvar[modality].exp()
-                )
-                .sum(dim=1)
-                .mean()
-            )
+            # Calculate reconstruction and KLD loss for each modality
+            loss_recon += self.__reconstruction_loss(x[modality], x_recon[modality], recon_loss_norm=self.cfg.CADA_VAE.NORM_TYPE)
+            loss_kld += (0.5 * (1 + z_logvar[modality] - z_mu[modality].pow(2) - z_logvar[modality].exp()).sum(dim=1).mean())
 
         # Calculate standart vae loss as sum of reconstion loss and
         # Kullback–Leibler divergence
@@ -305,10 +282,12 @@ class CADAVAETrainer(TrainerBase):
 
         loss_mu = (z_mu_1 - z_mu_2).pow(2).sum(dim=1)
         loss_var = (
-            ((z_logvar_1 / 2).exp() - (z_logvar_2 / 2).exp()).pow(2).sum(dim=1)
+            # ((z_logvar_1 / 2).exp() - (z_logvar_2 / 2).exp()).pow(2).sum(dim=1)
+            (z_logvar_1.exp().pow(1.0 / 2) - z_logvar_2.exp().pow(1.0 / 2)).pow(2).sum(dim=1)
         )
 
-        loss_da = torch.sqrt(loss_mu + loss_var).mean()
+        loss_da = (loss_mu + loss_var).sqrt().sum()
+        # loss_da = torch.sqrt(loss_mu + loss_var).mean()
 
         return loss_da
 
@@ -367,12 +346,10 @@ class CADAVAETrainer(TrainerBase):
             loss_recon: reconstruction loss.
         """
         if recon_loss_norm == "l1":
-            loss_recon = (
-                nn.functional.l1_loss(x, x_recon, reduction="sum") / x.shape[0]
-            )
+            loss_recon = nn.L1Loss(size_average=False)(x_recon, x)
+            # loss_recon = (nn.functional.l1_loss(x, x_recon, reduction="sum") / x.shape[0])
         elif recon_loss_norm == "l2":
-            loss_recon = (
-                nn.functional.mse_loss(x, x_recon, reduction="sum") / x.shape[0]
-            )
+            loss_recon = nn.MSELoss(size_average=False)(x_recon, x)
+            # loss_recon = (nn.functional.mse_loss(x, x_recon, reduction="sum") / x.shape[0])
 
         return loss_recon

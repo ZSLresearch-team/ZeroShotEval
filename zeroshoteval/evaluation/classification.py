@@ -11,13 +11,25 @@ from torch.utils.data import DataLoader
 from torch.utils.data.dataset import TensorDataset
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from zeroshoteval.utils.misc import RNG_seed_setup, log_model_info
+from zeroshoteval.utils.misc import setup_random_number_generator_seed, log_model_info
 from zeroshoteval.solver.optimizer_helper import build_optimizer
 from zeroshoteval.utils.checkpoint import load_embeddings
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class LINEAR_LOGSOFTMAX(nn.Module):
+    def __init__(self, input_dim, nclass):
+        super(LINEAR_LOGSOFTMAX, self).__init__()
+        self.fc = nn.Linear(input_dim,nclass)
+        self.logic = nn.LogSoftmax(dim=1)
+        self.lossfunction =  nn.NLLLoss()
+
+    def forward(self, x):
+        o = self.logic(self.fc(x))
+        return o
 
 
 class SoftmaxClassifier(nn.Module):
@@ -196,7 +208,7 @@ def classification_procedure(cfg: CfgNode,
         acc_unseen_hist(list): accuracy for unseen classes.
         acc_H_hist(list): harmonic mean of seen and unseen accuracies.
     """
-    RNG_seed_setup(cfg)
+    setup_random_number_generator_seed(cfg)
 
     if cfg.CLS.LOAD_DATA:
         # TODO: refactor embeddings saving/loading (see `saving`)

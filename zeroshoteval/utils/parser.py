@@ -1,39 +1,34 @@
-#!/usr/bin/env python3
-
 """Argument parser functions."""
-from fvcore.common.config import CfgNode
-from zeroshoteval.config.defaults import get_cfg
 
-from argparse import ArgumentParser, REMAINDER, Namespace
 import sys
+from argparse import ArgumentParser, REMAINDER, Namespace
+
+from fvcore.common.config import CfgNode
+
+from zeroshoteval.config.defaults import get_cfg_defaults
 
 
 def parse_args() -> Namespace:
     """
-    Parse the following arguments for a default parser for PySlowFast users.
+    Parse command line arguments. Two options are available:
 
-    Args:
-        cfg (str): path to the config file.
-        opts (argument): provide addtional options from the command line, it
-            overwrites the config loaded from file.
+        1. Pass `--cfg` argument with a path to YAML config file of a single
+        experiment to override specific default experiment settings. Global
+        defaults can be found in `zeroshoteval.config.defaults.py`
+
+        2. Pass a list of specific experiment configs to override a default
+        ones. This is the same action as `--cfg` passing, but it does not
+        require YAML config file creation.
     """
-    parser = ArgumentParser(
-        description="Provide ZeroShotEval pipeline."
-    )
+    parser = ArgumentParser(description="ZeroShotEval single experiment launcher.")
 
-    parser.add_argument(
-        "--cfg",
-        dest="cfg_file",
-        help="Path to the config file",
-        default=None,
-        type=str,
-    )
-    parser.add_argument(
-        "opts",
-        help="See zeroshoteval/config/defaults.py for all options",
-        default=None,
-        nargs=REMAINDER,
-    )
+    parser.add_argument("--cfg", dest="cfg_file", default=None, type=str,
+                        help="Path to YAML config file of a single experiment to override specific default experiment "
+                             "settings.")
+    parser.add_argument("options", default=None, nargs=REMAINDER,
+                        help="A list of specific experiment configs to override a default ones. This is the same action"
+                             " as `--cfg` passing, but it does not require YAML config file creation.")
+
     if len(sys.argv) == 1:
         parser.print_help()
 
@@ -42,20 +37,17 @@ def parse_args() -> Namespace:
 
 def load_config(args: Namespace) -> CfgNode:
     """
-    Given the arguemnts, load and initialize the configs.
-    Args:
-        args (argument): arguments includes `shard_id`, `num_shards`,
-            `init_method`, `cfg_file`, and `opts`.
+    Given the arguments, load and initialize the configs.
     """
-    # Setup cfg.
-    cfg: CfgNode = get_cfg()
+    # Setup cfg
+    cfg: CfgNode = get_cfg_defaults()
 
-    # Load config from cfg.
+    # Load config from cfg
     if args.cfg_file is not None:
         cfg.merge_from_file(args.cfg_file)
 
-    # Load config from command line, overwrite config from opts.
-    if args.opts is not None:
-        cfg.merge_from_list(args.opts)
+    # Load config from command line, overwrite config from opts
+    if args.options is not None:
+        cfg.merge_from_list(args.options)
 
     return cfg

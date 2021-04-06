@@ -1,11 +1,11 @@
-from fvcore.common.file_io import PathManager
-
 import functools
 import logging
 import os
 import sys
 import time
 from collections import Counter
+
+from fvcore.common.file_io import PathManager
 from tabulate import tabulate
 from termcolor import colored
 

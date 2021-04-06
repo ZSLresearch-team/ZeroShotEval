@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 from fvcore.common.config import CfgNode
 from torch.utils.data.dataloader import DataLoader
@@ -6,7 +8,7 @@ from zeroshoteval.data.modalities_embedding_dataset import ModalitiesEmbeddingDa
 from zeroshoteval.data.synthetic_dataset import GenEmbeddingDataset
 
 
-def construct_loader(cfg: CfgNode, split) -> DataLoader:
+def construct_loader(cfg: CfgNode, split, shuffle: Optional[bool] = None, drop_last: Optional[bool] = None) -> DataLoader:
     """
     Constructs the dataloader for zsl train/test procedure and the given
         dataset.
@@ -16,18 +18,24 @@ def construct_loader(cfg: CfgNode, split) -> DataLoader:
             zeroshoteval/config/defaults.py
         split(str): the split of the data loader. Include `trainval` and
             `test` for now.
+        drop_last(bool): whether to drop the last incomplite batch
 
     Returns:
         loader(DataLoader): data loader for zsl train/test procedure
     """
-    if split in ["train"]:
-        shuffle = True
-        drop_last = True
-    else:
-        shuffle = False
-        drop_last = False
+    if shuffle is None:
+        if split in ["train"]:
+            shuffle = True
+        else:
+            shuffle = False
 
-    modalities_dataset = ModalitiesEmbeddingDataset(root_dir=cfg.DATA.FEAT_EMB.PATH, modalities=["IMG"], split=split)
+    if drop_last is None:
+        if split in ["train"]:
+            drop_last = True
+        else:
+            drop_last = False
+
+    modalities_dataset = ModalitiesEmbeddingDataset(root_dir=cfg.DATA.FEAT_EMB.PATH, modalities=["IMG"], split=split)  # TODO: replace hardcoded modalities with proper value from config.
 
     modalities_dataloader = DataLoader(dataset=modalities_dataset,
                                        batch_size=cfg.ZSL.BATCH_SIZE,

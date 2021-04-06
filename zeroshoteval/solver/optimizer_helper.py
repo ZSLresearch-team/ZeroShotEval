@@ -1,7 +1,7 @@
 import torch
-from torch.nn.modules.module import Module
-from torch.optim.optimizer import Optimizer
 from fvcore.common.config import CfgNode
+from torch.nn import Module
+from torch.optim.optimizer import Optimizer
 
 PROCEDURE_TYPES = ['ZSL', 'CLS']
 OPTIMIZERS = ['SGD', 'ADAM']

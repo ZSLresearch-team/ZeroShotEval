@@ -10,7 +10,7 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def RNG_seed_setup(cfg):
+def setup_random_number_generator_seed(cfg):
     """
     Set up random number generators seed
 
